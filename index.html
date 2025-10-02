@@ -1518,14 +1518,14 @@
             invoiceItems.forEach(item => {
                 doc.setFontSize(10);
                 doc.text(`${item.name}`, 20, y);
-                doc.text(`${item.quantity} ${item.unit} × ₡${item.price.toLocaleString('es-CR')}`, 100, y);
-                doc.text(`₡${item.total.toLocaleString('es-CR')}`, 170, y);
+                doc.text(`${item.quantity} ${item.unit} × CRC ${item.price.toLocaleString('es-CR')}`, 100, y);
+                doc.text(`CRC ${item.total.toLocaleString('es-CR')}`, 170, y);
                 y += 10;
                 total += item.total;
             });
             
             doc.setFontSize(14);
-            doc.text(`TOTAL: ₡${total.toLocaleString('es-CR')}`, 150, y + 10);
+            doc.text(`TOTAL:CRC ${total.toLocaleString('es-CR')}`, 150, y + 10);
             
             doc.setFontSize(10);
             doc.text('¡Gracias por su compra!', 20, y + 30);
