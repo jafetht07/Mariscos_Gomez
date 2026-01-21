@@ -2182,16 +2182,25 @@
 
         // Función para verificar sesión automática
         function checkAutoLogin() {
-            const savedUser = localStorage.getItem('current_user');
-            if (savedUser && users[savedUser]) {
-                currentUser = savedUser;
-                isLoggedIn = true;
-                document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('mainSystem').classList.remove('hidden');
-                document.getElementById('currentUser').textContent = savedUser;
-                initializeSystem();
-            }
-        }
+    const savedUser = localStorage.getItem('current_user');
+    
+    // ⚠️ NUEVO: Verificar que el usuario aún exista en la lista
+    if (savedUser && !users[savedUser]) {
+        // El usuario fue eliminado - cerrar sesión
+        localStorage.removeItem('current_user');
+        showAlert('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.', 'warning');
+        return;
+    }
+    
+    if (savedUser && users[savedUser]) {
+        currentUser = savedUser;
+        isLoggedIn = true;
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainSystem').classList.remove('hidden');
+        document.getElementById('currentUser').textContent = savedUser;
+        initializeSystem();
+    }
+}
 
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
@@ -2527,4 +2536,3 @@
 
 </body>
 </html>
-
