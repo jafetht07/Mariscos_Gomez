@@ -6,9 +6,38 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
     color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+/* Fondo para pantalla de login - Mariscos */
+#loginScreen {
+    background-image: 
+        
+        url('https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Fondo para sistema principal - Océano/Agua */
+#mainSystem {
+    background-image: 
+       
+        url('https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    padding-top: 20px;
 }
 
 .container {
@@ -49,13 +78,13 @@ body {
 
 .login-container {
     max-width: 400px;
-    margin: 100px auto;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 15px;
-    padding: 30px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
 }
-
 .tabs {
     display: flex;
     background: rgba(255, 255, 255, 0.9);
@@ -637,7 +666,18 @@ body {
     .action-buttons {
         justify-content: center;
     }
+    #loginScreen {
+        background-attachment: scroll; /* Mejor rendimiento en móviles */
+        padding: 20px;
+    }
+    
+    .login-container {
+        margin: 0;
+        padding: 25px;
+        max-width: 100%;
+    }
 }
+
 
 /* Para pantallas muy pequeñas */
 @media (max-width: 480px) {
@@ -673,4 +713,33 @@ body {
     .product-name {
         font-size: 1.1em;
     }
+}
+
+/* Animación sutil para el login */
+#loginScreen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+    animation: wave 15s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes wave {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+}
+
+/* Mejorar el logo/título del login */
+.login-container h2 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 30px;
+    font-size: 2em;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
