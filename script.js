@@ -1,0 +1,1248 @@
+// Variables globales
+const users = {
+    'Gomez': 'qwrt2107',
+    'Tuko': '290597',
+    'Diana': 'qwrt2107'
+};
+
+let currentUser = null;
+let isLoggedIn = false;
+let products = JSON.parse(localStorage.getItem('mariscos_products') || '[]');
+let invoiceItems = [];
+let nextProductId = parseInt(localStorage.getItem('mariscos_next_id') || '1');
+let invoiceHistory = JSON.parse(localStorage.getItem('mariscos_invoices') || '[]');
+
+// Variables para paginación
+let currentProductPage = 1;
+let currentSalesPage = 1;
+const itemsPerPage = 12; // productos por página
+const invoicesPerPage = 20; // facturas por página
+
+// Configuración de mantenimiento
+let maintenanceConfig = JSON.parse(localStorage.getItem('mariscos_maintenance_config') || JSON.stringify({
+    maxInvoices: 1000,
+    autoCleanupEnabled: true,
+    lastCleanup: null
+}));
+
+// Función para calcular uso de localStorage
+function getStorageUsage() {
+    let total = 0;
+    for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+            total += localStorage[key].length + key.length;
+        }
+    }
+    return Math.round(total / 1024); // KB
+}
+
+// Función para actualizar monitor de almacenamiento
+function updateStorageMonitor() {
+    const used = getStorageUsage();
+    const limit = 5120; // 5MB en KB
+    const percentage = Math.round((used / limit) * 100);
+    
+    document.getElementById('storageUsed').textContent = used;
+    document.getElementById('storageLimit').textContent = limit;
+    document.getElementById('storagePercent').textContent = percentage + '%';
+    document.getElementById('totalRecords').textContent = products.length + invoiceHistory.length;
+    document.getElementById('totalProducts').textContent = products.length;
+    document.getElementById('totalInvoices').textContent = invoiceHistory.length;
+    
+    const fill = document.getElementById('storageFill');
+    fill.style.width = percentage + '%';
+    fill.className = 'storage-fill';
+    
+    if (percentage > 80) {
+        fill.classList.add('danger');
+        if (maintenanceConfig.autoCleanupEnabled) {
+            showStorageWarning();
+        }
+    } else if (percentage > 60) {
+        fill.classList.add('warning');
+    }
+}
+
+// Función para mostrar advertencia de almacenamiento
+function showStorageWarning() {
+    if (getStorageUsage() > 4096) { // > 4MB
+        showAlert('⚠️ Almacenamiento casi lleno. Se recomienda realizar limpieza automática.', 'warning');
+    }
+}
+
+// Función para mostrar alertas
+function showAlert(message, type) {
+    const existingAlert = document.querySelector('.alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.textContent = message;
+    
+    const targetContainer = isLoggedIn ? 
+        document.querySelector('#mainSystem .container') : 
+        document.querySelector('.login-container');
+    
+    if (targetContainer) {
+        if (isLoggedIn) {
+            targetContainer.insertBefore(alert, targetContainer.firstChild);
+        } else {
+            targetContainer.appendChild(alert);
+        }
+        
+        setTimeout(() => {
+            alert.remove();
+        }, 5000);
+    }
+}
+
+// Función de login
+function handleLogin(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    if (users[username] && users[username] === password) {
+        currentUser = username;
+        isLoggedIn = true;
+        localStorage.setItem('current_user', currentUser);
+        
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainSystem').classList.remove('hidden');
+        document.getElementById('currentUser').textContent = username;
+        
+        showAlert('✅ Inicio de sesión exitoso', 'success');
+        initializeSystem();
+    } else {
+        showAlert('❌ Usuario o contraseña incorrectos', 'danger');
+    }
+}
+
+// Función de logout
+function handleLogout() {
+    if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+        currentUser = null;
+        isLoggedIn = false;
+        localStorage.removeItem('current_user');
+        
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('mainSystem').classList.add('hidden');
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        
+        clearInvoice();
+    }
+}
+
+// Función para cambiar pestañas
+function showTab(tabName) {
+    document.querySelectorAll('.content').forEach(content => {
+        content.classList.add('hidden');
+    });
+    
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    document.getElementById(tabName).classList.remove('hidden');
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    
+    switch(tabName) {
+        case 'inventory':
+            displayProducts();
+            break;
+        case 'invoice':
+            updateInvoiceProductSelect();
+            break;
+        case 'reports':
+            updateReports();
+            break;
+        case 'sales-reports':
+            displaySalesReports();
+            break;
+        case 'maintenance':
+            updateMaintenanceStats();
+            break;
+    }
+}
+
+// Función para guardar productos
+function saveProducts() {
+    localStorage.setItem('mariscos_products', JSON.stringify(products));
+    localStorage.setItem('mariscos_next_id', nextProductId.toString());
+    updateStorageMonitor();
+}
+
+// Función para guardar facturas
+function saveInvoices() {
+    localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
+    updateStorageMonitor();
+}
+
+// Función para mostrar productos con paginación
+function displayProducts() {
+    const grid = document.getElementById('productGrid');
+    const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
+    
+    let filteredProducts = products;
+    if (searchTerm) {
+        filteredProducts = products.filter(product => 
+            product.name.toLowerCase().includes(searchTerm) ||
+            product.category.toLowerCase().includes(searchTerm)
+        );
+    }
+
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    const startIndex = (currentProductPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageProducts = filteredProducts.slice(startIndex, endIndex);
+
+    grid.innerHTML = '';
+    
+    if (pageProducts.length === 0) {
+        grid.innerHTML = '<div class="product-card"><h3>📦 No hay productos</h3><p>Agrega productos usando la pestaña "Agregar Producto".</p></div>';
+        document.getElementById('productsPagination').style.display = 'none';
+        return;
+    }
+    
+    pageProducts.forEach(product => {
+        const stockClass = product.stock < 10 ? 'stock-low' : 'stock-ok';
+        const stockIcon = product.stock < 10 ? '⚠️' : '✅';
+        
+        const productCard = document.createElement('div');
+        productCard.className = 'product-card';
+        productCard.innerHTML = `
+            <div class="product-name">${product.name}</div>
+            <div class="product-info">📂 Categoría: ${product.category}</div>
+            <div class="product-info">💰 Precio: ₡${product.price.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / ${product.unit}</div>
+            <div class="product-info ${stockClass}">${stockIcon} Stock: ${product.stock} ${product.unit}</div>
+            <div class="action-buttons">
+                <button class="btn btn-sm" onclick="editProduct(${product.id})">✏️ Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.id})">🗑️ Eliminar</button>
+            </div>
+        `;
+        grid.appendChild(productCard);
+    });
+
+    // Actualizar paginación
+    if (totalPages > 1) {
+        document.getElementById('productsPagination').style.display = 'flex';
+        document.getElementById('productPageInfo').textContent = `Página ${currentProductPage} de ${totalPages}`;
+        
+        const prevBtn = document.querySelector('#productsPagination button:first-child');
+        const nextBtn = document.querySelector('#productsPagination button:last-child');
+        
+        prevBtn.disabled = currentProductPage === 1;
+        nextBtn.disabled = currentProductPage === totalPages;
+    } else {
+        document.getElementById('productsPagination').style.display = 'none';
+    }
+}
+
+// Función para cambiar página de productos
+function changeProductPage(direction) {
+    const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
+    let filteredProducts = products;
+    if (searchTerm) {
+        filteredProducts = products.filter(product => 
+            product.name.toLowerCase().includes(searchTerm) ||
+            product.category.toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    
+    currentProductPage += direction;
+    if (currentProductPage < 1) currentProductPage = 1;
+    if (currentProductPage > totalPages) currentProductPage = totalPages;
+    
+    displayProducts();
+}
+
+// Función para buscar productos (mejorada)
+function searchProducts() {
+    currentProductPage = 1; // Reiniciar a primera página
+    displayProducts();
+}
+
+// Función para agregar producto
+function handleAddProduct(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('productName').value.trim();
+    const category = document.getElementById('productCategory').value;
+    const price = parseFloat(document.getElementById('productPrice').value);
+    const stock = parseInt(document.getElementById('productStock').value);
+    const unit = document.getElementById('productUnit').value;
+    
+    if (!name || !category || !price || !stock || !unit) {
+        showAlert('⚠️ Por favor completa todos los campos', 'danger');
+        return;
+    }
+    
+    // Verificar límite de productos
+    if (products.length >= 1000) {
+        showAlert('⚠️ Límite de productos alcanzado. Considera usar la función de mantenimiento.', 'warning');
+        return;
+    }
+    
+    const newProduct = {
+        id: nextProductId++,
+        name,
+        category,
+        price,
+        stock,
+        unit,
+        createdAt: new Date().toISOString()
+    };
+    
+    products.push(newProduct);
+    saveProducts();
+    
+    document.getElementById('addProductForm').reset();
+    showAlert('✅ Producto agregado exitosamente', 'success');
+    showTab('inventory');
+}
+
+// Función para editar producto
+function editProduct(id) {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    
+    const newPrice = prompt(`💰 Nuevo precio para ${product.name}:`, product.price);
+    const newStock = prompt(`📦 Nuevo stock para ${product.name}:`, product.stock);
+    
+    if (newPrice !== null && newStock !== null) {
+        product.price = parseFloat(newPrice) || product.price;
+        product.stock = parseInt(newStock) || product.stock;
+        product.updatedAt = new Date().toISOString();
+        saveProducts();
+        displayProducts();
+        showAlert('✅ Producto actualizado exitosamente', 'success');
+    }
+}
+
+// Función para eliminar producto
+function deleteProduct(id) {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    
+    if (confirm(`¿Estás seguro de que quieres eliminar "${product.name}"?\n\nEsta acción no se puede deshacer.`)) {
+        products = products.filter(p => p.id !== id);
+        saveProducts();
+        displayProducts();
+        showAlert('🗑️ Producto eliminado exitosamente', 'success');
+    }
+}
+
+// Función para actualizar select de productos en facturación
+function updateInvoiceProductSelect() {
+    const select = document.getElementById('invoiceProduct');
+    select.innerHTML = '<option value="">Seleccionar producto</option>';
+    
+    products.forEach(product => {
+        if (product.stock > 0) {
+            const option = document.createElement('option');
+            option.value = product.id;
+            option.textContent = `${product.name} - ₡${product.price.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / ${product.unit} (Stock: ${product.stock})`;
+            select.appendChild(option);
+        }
+    });
+}
+
+// Función para agregar producto a la factura
+function addToInvoice() {
+    const productId = parseInt(document.getElementById('invoiceProduct').value);
+    const quantity = parseFloat(document.getElementById('invoiceQuantity').value);
+    
+    if (!productId || !quantity || quantity <= 0) {
+        showAlert('⚠️ Por favor selecciona un producto y cantidad válida', 'danger');
+        return;
+    }
+    
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    
+    if (quantity > product.stock) {
+        showAlert(`⚠️ Stock insuficiente. Stock disponible: ${product.stock} ${product.unit}`, 'danger');
+        return;
+    }
+    
+    const existingItem = invoiceItems.find(item => item.productId === productId);
+    if (existingItem) {
+        if (existingItem.quantity + quantity > product.stock) {
+            showAlert(`⚠️ Stock insuficiente. Stock disponible: ${product.stock} ${product.unit}`, 'danger');
+            return;
+        }
+        existingItem.quantity += quantity;
+        existingItem.total = existingItem.quantity * existingItem.price;
+    } else {
+        invoiceItems.push({
+            productId,
+            name: product.name,
+            price: product.price,
+            quantity,
+            unit: product.unit,
+            total: product.price * quantity
+        });
+    }
+    
+    document.getElementById('invoiceProduct').value = '';
+    document.getElementById('invoiceQuantity').value = '';
+    
+    updateInvoiceDisplay();
+}
+
+// Función para actualizar la visualización de la factura
+function updateInvoiceDisplay() {
+    const itemsContainer = document.getElementById('invoiceItems');
+    const totalContainer = document.getElementById('invoiceTotal');
+    
+    itemsContainer.innerHTML = '';
+    let total = 0;
+    
+    invoiceItems.forEach((item, index) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'invoice-item';
+        itemDiv.innerHTML = `
+            <div>
+                <strong>${item.name}</strong><br>
+                ${item.quantity} ${item.unit} × ₡${item.price.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+            <div>
+                ₡${item.total.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                <button class="btn btn-danger btn-sm" onclick="removeFromInvoice(${index})">❌</button>
+            </div>
+        `;
+        itemsContainer.appendChild(itemDiv);
+        total += item.total;
+    });
+    
+    totalContainer.textContent = `Total: ₡${total.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+}
+
+// Función para remover item de la factura
+function removeFromInvoice(index) {
+    if (confirm('¿Eliminar este producto de la factura?')) {
+        invoiceItems.splice(index, 1);
+        updateInvoiceDisplay();
+        showAlert('🗑️ Producto eliminado de la factura', 'success');
+    }
+}
+
+// Función para limpiar factura
+function clearInvoice() {
+    if (invoiceItems.length > 0 && !confirm('¿Estás seguro de que quieres limpiar toda la factura?')) {
+        return;
+    }
+    
+    invoiceItems = [];
+    document.getElementById('clientName').value = '';
+    document.getElementById('clientPhone').value = '';
+    document.getElementById('clientAddress').value = '';
+    updateInvoiceDisplay();
+    
+    if (invoiceItems.length === 0) {
+        showAlert('🗑️ Factura limpiada', 'info');
+    }
+}
+
+// Función para generar PDF de la factura
+function generateInvoicePDF() {
+    if (invoiceItems.length === 0) {
+        showAlert('⚠️ No hay productos en la factura', 'danger');
+        return;
+    }
+    
+    // Verificar límite de facturas
+    if (invoiceHistory.length >= maintenanceConfig.maxInvoices) {
+        if (confirm('Se ha alcanzado el límite de facturas. ¿Desea continuar? Se recomienda hacer limpieza de datos.')) {
+            // Continuar pero mostrar advertencia
+            showAlert('⚠️ Sistema cerca del límite. Visite la sección de Mantenimiento.', 'warning');
+        } else {
+            return;
+        }
+    }
+    
+    const clientName = document.getElementById('clientName').value || 'Cliente';
+    const clientPhone = document.getElementById('clientPhone').value || 'N/A';
+    const clientAddress = document.getElementById('clientAddress').value || 'N/A';
+    
+    const invoiceNumber = `FAC-${new Date().getFullYear()}-${String(invoiceHistory.length + 1).padStart(4, '0')}`;
+    const now = new Date();
+    
+    // Actualizar stock
+    invoiceItems.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+            product.stock -= item.quantity;
+        }
+    });
+    saveProducts();
+    
+    // Guardar factura
+    const invoice = {
+        number: invoiceNumber,
+        date: now.toLocaleDateString('es-CR'),
+        time: now.toLocaleTimeString('es-CR'),
+        fullDateTime: now.toISOString(),
+        client: { name: clientName, phone: clientPhone, address: clientAddress },
+        items: [...invoiceItems],
+        total: invoiceItems.reduce((sum, item) => sum + item.total, 0),
+        user: currentUser
+    };
+    invoiceHistory.push(invoice);
+    saveInvoices();
+    
+    // Generar PDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.setFontSize(20);
+    doc.text('🦐 Mariscos Gómez', 20, 20);
+    doc.setFontSize(12);
+    doc.text('Sistema de Facturación', 20, 30);
+    
+    doc.text(`Fecha: ${invoice.date}`, 150, 20);
+    doc.text(`Hora: ${invoice.time}`, 150, 30);
+    doc.text(`Factura #${invoiceNumber}`, 150, 40);
+    
+    doc.setFontSize(14);
+    doc.text('Datos del Cliente:', 20, 60);
+    doc.setFontSize(11);
+    doc.text(`Nombre: ${clientName}`, 20, 70);
+    doc.text(`Teléfono: ${clientPhone}`, 20, 80);
+    doc.text(`Dirección: ${clientAddress}`, 20, 90);
+    
+    doc.setFontSize(14);
+    doc.text('Productos:', 20, 110);
+    
+    let y = 120;
+    let total = 0;
+    
+    invoiceItems.forEach(item => {
+        doc.setFontSize(10);
+        doc.text(`${item.name}`, 20, y);
+        doc.text(`${item.quantity} ${item.unit} × CRC ${item.price.toLocaleString('es-CR')}`, 100, y);
+        doc.text(`CRC ${item.total.toLocaleString('es-CR')}`, 170, y);
+        y += 10;
+        total += item.total;
+    });
+    
+    doc.setFontSize(14);
+    doc.text(`TOTAL:CRC ${total.toLocaleString('es-CR')}`, 150, y + 10);
+    
+    doc.setFontSize(10);
+    doc.text('¡Gracias por su compra!', 20, y + 30);
+    doc.text(`Atendido por: ${currentUser}`, 20, y + 40);
+    
+    doc.save(`factura_${clientName.replace(/\s+/g, '_')}_${invoiceNumber}.pdf`);
+    
+    showAlert('📄 Factura PDF generada exitosamente', 'success');
+    clearInvoice();
+    updateInvoiceProductSelect();
+    
+    // Verificar si es necesario hacer limpieza automática
+    if (maintenanceConfig.autoCleanupEnabled && getStorageUsage() > 4096) {
+        setTimeout(() => {
+            if (confirm('El sistema ha detectado que el almacenamiento está casi lleno. ¿Desea realizar una limpieza automática?')) {
+                optimizeStorage();
+            }
+        }, 2000);
+    }
+}
+
+// Función para actualizar reportes generales
+function updateReports() {
+    const totalProductsCount = products.length;
+    const lowStockProducts = products.filter(p => p.stock < 10).length;
+    const totalValue = products.reduce((sum, product) => sum + (product.price * product.stock), 0);
+    const totalInvoicesCount = invoiceHistory.length;
+    const totalSales = invoiceHistory.reduce((sum, invoice) => sum + invoice.total, 0);
+    
+    document.getElementById('totalProductsStat').textContent = totalProductsCount;
+    document.getElementById('lowStockProductsStat').textContent = lowStockProducts;
+    document.getElementById('totalInventoryValueStat').textContent = totalValue.toLocaleString('es-CR', {minimumFractionDigits: 0});
+    document.getElementById('totalInvoicesStat').textContent = totalInvoicesCount;
+    document.getElementById('totalSalesStat').textContent = totalSales.toLocaleString('es-CR', {minimumFractionDigits: 0});
+}
+
+// Función para mostrar reportes de ventas con paginación
+function displaySalesReports() {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    document.getElementById('startDate').value = firstDayOfMonth.toISOString().split('T')[0];
+    document.getElementById('endDate').value = today.toISOString().split('T')[0];
+    
+    filterSales();
+}
+
+// Función para filtrar ventas
+function filterSales() {
+    currentSalesPage = 1; // Reiniciar paginación
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    let filteredInvoices = [...invoiceHistory];
+    
+    if (startDate || endDate) {
+        filteredInvoices = invoiceHistory.filter(invoice => {
+            const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+            const start = startDate ? new Date(startDate) : new Date('1900-01-01');
+            const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
+            
+            return invoiceDate >= start && invoiceDate <= end;
+        });
+    }
+    
+    updateSalesTable(filteredInvoices);
+    updatePeriodSummary(filteredInvoices);
+}
+
+// Función para cambiar página de ventas
+function changeSalesPage(direction) {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    let filteredInvoices = [...invoiceHistory];
+    
+    if (startDate || endDate) {
+        filteredInvoices = invoiceHistory.filter(invoice => {
+            const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+            const start = startDate ? new Date(startDate) : new Date('1900-01-01');
+            const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
+            
+            return invoiceDate >= start && invoiceDate <= end;
+        });
+    }
+    
+    const totalPages = Math.ceil(filteredInvoices.length / invoicesPerPage);
+    
+    currentSalesPage += direction;
+    if (currentSalesPage < 1) currentSalesPage = 1;
+    if (currentSalesPage > totalPages) currentSalesPage = totalPages;
+    
+    updateSalesTable(filteredInvoices);
+    updatePeriodSummary(filteredInvoices);
+}
+
+// Función para limpiar filtros de fecha
+function clearDateFilter() {
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    filterSales();
+}
+
+// Función para actualizar tabla de ventas con paginación
+function updateSalesTable(invoices) {
+    const tbody = document.getElementById('salesTableBody');
+    tbody.innerHTML = '';
+    
+    if (invoices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No hay ventas en el período seleccionado</td></tr>';
+        document.getElementById('salesPagination').style.display = 'none';
+        return;
+    }
+    
+    const totalPages = Math.ceil(invoices.length / invoicesPerPage);
+    const startIndex = (currentSalesPage - 1) * invoicesPerPage;
+    const endIndex = startIndex + invoicesPerPage;
+    const pageInvoices = invoices.slice(startIndex, endIndex).reverse();
+    
+    pageInvoices.forEach(invoice => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${invoice.number}</td>
+            <td>${invoice.date}</td>
+            <td>${invoice.time || 'N/A'}</td>
+            <td>${invoice.client.name}</td>
+            <td>${invoice.client.phone}</td>
+            <td>₡${invoice.total.toLocaleString('es-CR', {minimumFractionDigits: 2})}</td>
+            <td>
+                <button class="btn btn-sm" onclick="showInvoiceDetails('${invoice.number}')" title="Ver detalles">👁️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${invoice.number}')" title="Eliminar factura">🗑️</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Actualizar paginación
+    if (totalPages > 1) {
+        document.getElementById('salesPagination').style.display = 'flex';
+        document.getElementById('salesPageInfo').textContent = `Página ${currentSalesPage} de ${totalPages}`;
+        
+        const prevBtn = document.querySelector('#salesPagination button:first-child');
+        const nextBtn = document.querySelector('#salesPagination button:last-child');
+        
+        prevBtn.disabled = currentSalesPage === 1;
+        nextBtn.disabled = currentSalesPage === totalPages;
+    } else {
+        document.getElementById('salesPagination').style.display = 'none';
+    }
+}
+
+// Función para actualizar resumen del período
+function updatePeriodSummary(invoices) {
+    const totalSales = invoices.reduce((sum, invoice) => sum + invoice.total, 0);
+    const invoiceCount = invoices.length;
+    const averageAmount = invoiceCount > 0 ? totalSales / invoiceCount : 0;
+    
+    document.getElementById('periodTotalSales').textContent = totalSales.toLocaleString('es-CR', {minimumFractionDigits: 2});
+    document.getElementById('periodInvoiceCount').textContent = invoiceCount;
+    document.getElementById('averageInvoiceAmount').textContent = averageAmount.toLocaleString('es-CR', {minimumFractionDigits: 2});
+}
+
+// Función para mostrar detalles de factura
+function showInvoiceDetails(invoiceNumber) {
+    const invoice = invoiceHistory.find(inv => inv.number === invoiceNumber);
+    if (!invoice) return;
+    
+    let details = `📄 Factura: ${invoice.number}\n`;
+    details += `📅 Fecha: ${invoice.date} ${invoice.time || ''}\n`;
+    details += `👤 Cliente: ${invoice.client.name}\n`;
+    details += `📞 Teléfono: ${invoice.client.phone}\n`;
+    details += `📍 Dirección: ${invoice.client.address}\n\n`;
+    details += `📦 Productos:\n`;
+    
+    invoice.items.forEach(item => {
+        details += `• ${item.name}: ${item.quantity} ${item.unit} × ₡${item.price.toLocaleString('es-CR')} = ₡${item.total.toLocaleString('es-CR')}\n`;
+    });
+    
+    details += `\n💰 Total: ₡${invoice.total.toLocaleString('es-CR')}`;
+    if (invoice.user) {
+        details += `\n👤 Atendido por: ${invoice.user}`;
+    }
+    
+    alert(details);
+}
+
+// Nueva función para eliminar factura
+function deleteInvoice(invoiceNumber) {
+    const invoiceIndex = invoiceHistory.findIndex(inv => inv.number === invoiceNumber);
+    if (invoiceIndex === -1) {
+        showAlert('⚠️ Factura no encontrada', 'danger');
+        return;
+    }
+    
+    const invoice = invoiceHistory[invoiceIndex];
+    
+    const confirmMessage = `⚠️ ELIMINAR FACTURA\n\nFactura: ${invoice.number}\nCliente: ${invoice.client.name}\nTotal: ₡${invoice.total.toLocaleString('es-CR')}\nFecha: ${invoice.date}\n\n¿Estás seguro de eliminar esta factura?\n\nEsta acción restaurará el stock de los productos vendidos y eliminará permanentemente la factura del sistema.`;
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    // Restaurar stock de productos
+    invoice.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+            product.stock += item.quantity;
+            product.updatedAt = new Date().toISOString();
+        }
+    });
+    
+    // Eliminar factura del historial
+    invoiceHistory.splice(invoiceIndex, 1);
+    
+    // Guardar cambios
+    saveProducts();
+    saveInvoices();
+    
+    showAlert(`✅ Factura ${invoice.number} eliminada exitosamente. Stock restaurado.`, 'success');
+    
+    // Actualizar la vista actual
+    filterSales();
+    updateReports();
+}
+
+// Funciones de exportación
+function exportSalesToPDF() {
+    const filteredInvoices = getFilteredInvoices();
+    
+    if (filteredInvoices.length === 0) {
+        showAlert('⚠️ No hay datos para exportar', 'danger');
+        return;
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('Mariscos Gómez', 20, 20);
+    doc.setFontSize(14);
+    doc.text('Reporte de Ventas', 20, 30);
+    
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const periodText = startDate && endDate ? 
+        `Período: ${startDate} a ${endDate}` : 
+        'Período: Todas las ventas';
+    
+    doc.setFontSize(10);
+    doc.text(periodText, 20, 40);
+    doc.text(`Generado: ${new Date().toLocaleString('es-CR')}`, 20, 50);
+    doc.text(`Por: ${currentUser}`, 20, 60);
+    
+    const totalSales = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    doc.setFontSize(12);
+    doc.text(`Total de Facturas: ${filteredInvoices.length}`, 20, 80);
+    doc.text(`Total Vendido: ₡${totalSales.toLocaleString('es-CR')}`, 20, 90);
+    
+    const tableData = filteredInvoices.map(invoice => [
+        invoice.number,
+        invoice.date,
+        invoice.time || 'N/A',
+        invoice.client.name,
+        `₡${invoice.total.toLocaleString('es-CR')}`
+    ]);
+    
+    doc.autoTable({
+        head: [['# Factura', 'Fecha', 'Hora', 'Cliente', 'Total']],
+        body: tableData,
+        startY: 100,
+        theme: 'striped',
+        headStyles: { fillColor: [52, 152, 219] },
+        styles: { fontSize: 8 }
+    });
+    
+    const fileName = startDate && endDate ? 
+        `reporte_ventas_${startDate}_${endDate}.pdf` : 
+        `reporte_ventas_completo.pdf`;
+    
+    doc.save(fileName);
+    showAlert('📄 Reporte PDF exportado exitosamente', 'success');
+}
+
+function exportSalesToExcel() {
+    const filteredInvoices = getFilteredInvoices();
+    
+    if (filteredInvoices.length === 0) {
+        showAlert('⚠️ No hay datos para exportar', 'danger');
+        return;
+    }
+    
+    const excelData = filteredInvoices.map(invoice => ({
+        'Número de Factura': invoice.number,
+        'Fecha': invoice.date,
+        'Hora': invoice.time || 'N/A',
+        'Cliente': invoice.client.name,
+        'Teléfono': invoice.client.phone,
+        'Dirección': invoice.client.address,
+        'Total': invoice.total,
+        'Atendido por': invoice.user || 'N/A'
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Reporte de Ventas');
+    
+    const summary = [
+        ['RESUMEN DEL PERÍODO'],
+        [''],
+        ['Total de Facturas', filteredInvoices.length],
+        ['Total Vendido', filteredInvoices.reduce((sum, inv) => sum + inv.total, 0)],
+        ['Promedio por Factura', filteredInvoices.length > 0 ? filteredInvoices.reduce((sum, inv) => sum + inv.total, 0) / filteredInvoices.length : 0],
+        [''],
+        ['Generado por', currentUser],
+        ['Fecha de generación', new Date().toLocaleString('es-CR')]
+    ];
+    
+    const summaryWs = XLSX.utils.aoa_to_sheet(summary);
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumen');
+    
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const fileName = startDate && endDate ? 
+        `reporte_ventas_${startDate}_${endDate}.xlsx` : 
+        `reporte_ventas_completo.xlsx`;
+    
+    XLSX.writeFile(wb, fileName);
+    showAlert('📊 Reporte Excel exportado exitosamente', 'success');
+}
+
+function printSalesReport() {
+    const filteredInvoices = getFilteredInvoices();
+    
+    if (filteredInvoices.length === 0) {
+        showAlert('⚠️ No hay datos para imprimir', 'danger');
+        return;
+    }
+    
+    window.print();
+}
+
+function getFilteredInvoices() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    if (!startDate && !endDate) {
+        return [...invoiceHistory].reverse();
+    }
+    
+    return invoiceHistory.filter(invoice => {
+        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+        const start = startDate ? new Date(startDate) : new Date('1900-01-01');
+        const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
+        
+        return invoiceDate >= start && invoiceDate <= end;
+    }).reverse();
+}
+
+// Nuevas funciones de mantenimiento
+function updateMaintenanceStats() {
+    const storageUsage = getStorageUsage();
+    const storageLimit = 5120;
+    const percentage = Math.round((storageUsage / storageLimit) * 100);
+    
+    // Calcular registros antiguos (más de 6 meses)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const oldInvoices = invoiceHistory.filter(invoice => {
+        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+        return invoiceDate < sixMonthsAgo;
+    });
+    
+    // Calcular rendimiento del sistema basado en cantidad de datos
+    let performance = 100;
+    if (products.length > 500) performance -= 10;
+    if (invoiceHistory.length > 1000) performance -= 15;
+    if (storageUsage > 3000) performance -= 20;
+    if (storageUsage > 4000) performance -= 30;
+    
+    document.getElementById('storageUsagePercent').textContent = percentage + '%';
+    document.getElementById('oldRecordsCount').textContent = oldInvoices.length;
+    document.getElementById('systemPerformance').textContent = Math.max(performance, 0) + '%';
+    
+    // Actualizar alertas del sistema
+    updateSystemAlerts(percentage, oldInvoices.length, performance);
+    
+    // Cargar configuración
+    document.getElementById('maxInvoices').value = maintenanceConfig.maxInvoices;
+    document.getElementById('autoCleanupEnabled').checked = maintenanceConfig.autoCleanupEnabled;
+}
+
+function updateSystemAlerts(storagePercent, oldRecordsCount, performance) {
+    const alertsContainer = document.getElementById('systemAlerts');
+    alertsContainer.innerHTML = '';
+    
+    const alerts = [];
+    
+    if (storagePercent > 80) {
+        alerts.push({
+            type: 'danger',
+            message: '⚠️ Almacenamiento crítico (>80%). Se requiere limpieza inmediata.',
+            action: 'optimizeStorage'
+        });
+    } else if (storagePercent > 60) {
+        alerts.push({
+            type: 'warning',
+            message: '⚠️ Almacenamiento alto (>60%). Considera hacer limpieza.',
+            action: 'optimizeStorage'
+        });
+    }
+    
+    if (oldRecordsCount > 100) {
+        alerts.push({
+            type: 'info',
+            message: `📅 ${oldRecordsCount} facturas antiguas pueden ser archivadas.`,
+            action: 'archiveOldData'
+        });
+    }
+    
+    if (performance < 70) {
+        alerts.push({
+            type: 'warning',
+            message: '🐌 Rendimiento del sistema reducido. Se recomienda optimización.',
+            action: 'optimizeStorage'
+        });
+    }
+    
+    if (alerts.length === 0) {
+        alertsContainer.innerHTML = '<div class="alert alert-success">✅ Sistema funcionando correctamente</div>';
+        return;
+    }
+    
+    alerts.forEach(alert => {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${alert.type}`;
+        alertDiv.innerHTML = `
+            ${alert.message}
+            <button class="btn btn-sm" onclick="${alert.action}()" style="margin-left: 10px; padding: 5px 10px;">Resolver</button>
+        `;
+        alertsContainer.appendChild(alertDiv);
+    });
+}
+
+function archiveOldData() {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const oldInvoices = invoiceHistory.filter(invoice => {
+        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+        return invoiceDate < sixMonthsAgo;
+    });
+    
+    if (oldInvoices.length === 0) {
+        showAlert('ℹ️ No hay facturas antiguas para archivar', 'info');
+        return;
+    }
+    
+    if (!confirm(`¿Desea archivar ${oldInvoices.length} facturas antiguas? Se exportarán a Excel antes de eliminarlas.`)) {
+        return;
+    }
+    
+    // Exportar datos antiguos
+    const ws = XLSX.utils.json_to_sheet(oldInvoices.map(invoice => ({
+        'Número de Factura': invoice.number,
+        'Fecha': invoice.date,
+        'Hora': invoice.time || 'N/A',
+        'Cliente': invoice.client.name,
+        'Teléfono': invoice.client.phone,
+        'Dirección': invoice.client.address,
+        'Total': invoice.total,
+        'Atendido por': invoice.user || 'N/A'
+    })));
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Facturas Archivadas');
+    
+    const fileName = `archivo_facturas_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    
+    // Remover facturas antiguas
+    invoiceHistory = invoiceHistory.filter(invoice => {
+        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+        return invoiceDate >= sixMonthsAgo;
+    });
+    
+    saveInvoices();
+    showAlert(`✅ ${oldInvoices.length} facturas archivadas y exportadas exitosamente`, 'success');
+    updateMaintenanceStats();
+}
+
+function exportAllData() {
+    const wb = XLSX.utils.book_new();
+    
+    // Hoja de productos
+    const productsWs = XLSX.utils.json_to_sheet(products);
+    XLSX.utils.book_append_sheet(wb, productsWs, 'Productos');
+    
+    // Hoja de facturas
+    const invoicesData = invoiceHistory.map(invoice => ({
+        'Número': invoice.number,
+        'Fecha': invoice.date,
+        'Hora': invoice.time || 'N/A',
+        'Cliente': invoice.client.name,
+        'Teléfono': invoice.client.phone,
+        'Dirección': invoice.client.address,
+        'Total': invoice.total,
+        'Usuario': invoice.user || 'N/A'
+    }));
+    const invoicesWs = XLSX.utils.json_to_sheet(invoicesData);
+    XLSX.utils.book_append_sheet(wb, invoicesWs, 'Facturas');
+    
+    // Hoja de resumen
+    const summary = [
+        ['BACKUP COMPLETO - MARISCOS GÓMEZ'],
+        [''],
+        ['Fecha de backup', new Date().toLocaleString('es-CR')],
+        ['Usuario', currentUser],
+        [''],
+        ['ESTADÍSTICAS'],
+        ['Total productos', products.length],
+        ['Total facturas', invoiceHistory.length],
+        ['Uso de almacenamiento (KB)', getStorageUsage()],
+        [''],
+        ['CONFIGURACIÓN'],
+        ['Máximo facturas', maintenanceConfig.maxInvoices],
+        ['Limpieza automática', maintenanceConfig.autoCleanupEnabled ? 'Habilitada' : 'Deshabilitada']
+    ];
+    const summaryWs = XLSX.utils.aoa_to_sheet(summary);
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Información');
+    
+    const fileName = `backup_completo_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    
+    showAlert('💾 Backup completo exportado exitosamente', 'success');
+}
+
+function optimizeStorage() {
+    const initialUsage = getStorageUsage();
+    
+    // Limpiar datos duplicados y optimizar estructura
+    const uniqueProducts = [];
+    const productNames = new Set();
+    
+    products.forEach(product => {
+        const key = `${product.name}-${product.category}`;
+        if (!productNames.has(key)) {
+            productNames.add(key);
+            uniqueProducts.push(product);
+        }
+    });
+    
+    const removedProducts = products.length - uniqueProducts.length;
+    products = uniqueProducts;
+    
+    // Optimizar facturas eliminando campos innecesarios
+    invoiceHistory = invoiceHistory.map(invoice => ({
+        number: invoice.number,
+        date: invoice.date,
+        time: invoice.time,
+        fullDateTime: invoice.fullDateTime,
+        client: invoice.client,
+        items: invoice.items.map(item => ({
+            productId: item.productId,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            unit: item.unit,
+            total: item.total
+        })),
+        total: invoice.total,
+        user: invoice.user
+    }));
+    
+    saveProducts();
+    saveInvoices();
+    
+    const finalUsage = getStorageUsage();
+    const saved = initialUsage - finalUsage;
+    
+    showAlert(`⚡ Optimización completada. Espacio liberado: ${saved}KB. Productos duplicados removidos: ${removedProducts}`, 'success');
+    updateStorageMonitor();
+    updateMaintenanceStats();
+}
+
+function clearOldInvoices() {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const oldInvoices = invoiceHistory.filter(invoice => {
+        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+        return invoiceDate < threeMonthsAgo;
+    });
+    
+    if (oldInvoices.length === 0) {
+        showAlert('ℹ️ No hay facturas antiguas para eliminar', 'info');
+        return;
+    }
+    
+    if (!confirm(`⚠️ ADVERTENCIA: Esta acción eliminará permanentemente ${oldInvoices.length} facturas de más de 3 meses. ¿Continuar?`)) {
+        return;
+    }
+    
+    const totalSalesRemoved = oldInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    
+    invoiceHistory = invoiceHistory.filter(invoice => {
+        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
+        return invoiceDate >= threeMonthsAgo;
+    });
+    
+    saveInvoices();
+    showAlert(`🗑️ ${oldInvoices.length} facturas eliminadas (₡${totalSalesRemoved.toLocaleString('es-CR')} en ventas)`, 'success');
+    updateMaintenanceStats();
+}
+
+function saveMaintenanceConfig() {
+    const maxInvoices = parseInt(document.getElementById('maxInvoices').value);
+    const autoCleanupEnabled = document.getElementById('autoCleanupEnabled').checked;
+    
+    if (maxInvoices < 100 || maxInvoices > 10000) {
+        showAlert('⚠️ El límite de facturas debe estar entre 100 y 10,000', 'danger');
+        return;
+    }
+    
+    maintenanceConfig = {
+        maxInvoices,
+        autoCleanupEnabled,
+        lastCleanup: new Date().toISOString()
+    };
+    
+    localStorage.setItem('mariscos_maintenance_config', JSON.stringify(maintenanceConfig));
+    showAlert('💾 Configuración de mantenimiento guardada', 'success');
+    updateMaintenanceStats();
+}
+
+// Función para inicializar el sistema
+function initializeSystem() {
+    updateStorageMonitor();
+    displayProducts();
+    updateReports();
+    
+    // Verificar si es necesaria limpieza automática al inicio
+    if (maintenanceConfig.autoCleanupEnabled && getStorageUsage() > 4096) {
+        setTimeout(() => {
+            showAlert('🔧 Sistema requiere optimización. Visite la sección de Mantenimiento.', 'warning');
+        }, 3000);
+    }
+}
+
+// Función para verificar sesión automática
+function checkAutoLogin() {
+    const savedUser = localStorage.getItem('current_user');
+    
+    // Verificar que el usuario aún exista en la lista
+    if (savedUser && !users[savedUser]) {
+        // El usuario fue eliminado - cerrar sesión
+        localStorage.removeItem('current_user');
+        showAlert('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.', 'warning');
+        return;
+    }
+    
+    if (savedUser && users[savedUser]) {
+        currentUser = savedUser;
+        isLoggedIn = true;
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainSystem').classList.remove('hidden');
+        document.getElementById('currentUser').textContent = savedUser;
+        initializeSystem();
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Cargar configuración de mantenimiento
+    maintenanceConfig = JSON.parse(localStorage.getItem('mariscos_maintenance_config') || JSON.stringify({
+        maxInvoices: 1000,
+        autoCleanupEnabled: true,
+        lastCleanup: null
+    }));
+    
+    checkAutoLogin();
+    
+    // Event listeners para el login
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    
+    // Event listeners para las pestañas
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            showTab(this.dataset.tab);
+        });
+    });
+    
+    // Event listeners para productos
+    document.getElementById('addProductForm').addEventListener('submit', handleAddProduct);
+    document.getElementById('searchProducts').addEventListener('keyup', searchProducts);
+    
+    // Event listeners para facturación
+    document.getElementById('addToInvoiceBtn').addEventListener('click', addToInvoice);
+    document.getElementById('generatePDFBtn').addEventListener('click', generateInvoicePDF);
+    document.getElementById('clearInvoiceBtn').addEventListener('click', clearInvoice);
+    
+    // Event listeners para reportes de ventas
+    document.getElementById('filterSalesBtn').addEventListener('click', filterSales);
+    document.getElementById('clearFilterBtn').addEventListener('click', clearDateFilter);
+    document.getElementById('exportPDFBtn').addEventListener('click', exportSalesToPDF);
+    document.getElementById('exportExcelBtn').addEventListener('click', exportSalesToExcel);
+    document.getElementById('printReportBtn').addEventListener('click', printSalesReport);
+    
+    // Actualizar monitor de almacenamiento cada 30 segundos
+    setInterval(updateStorageMonitor, 30000);
+});
