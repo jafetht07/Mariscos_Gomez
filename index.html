@@ -1,1332 +1,347 @@
-// Variables globales
-const users = {
-    'Gomez': { password: 'qwrt2107', securityQuestion: '¿Cuál es tu color favorito?', securityAnswer: 'vino' },
-    'Tuko': { password: '290597', securityQuestion: '¿En qué ciudad naciste?', securityAnswer: 'limon', isAdmin: true },
-    'Diana': { password: 'qwrt2107', securityQuestion: '¿Cuál es el nombre de tu mascota?', securityAnswer: 'milo' }
-};
-
-let currentUser = null;
-let isLoggedIn = false;
-let products = JSON.parse(localStorage.getItem('mariscos_products') || '[]');
-let invoiceItems = [];
-let nextProductId = parseInt(localStorage.getItem('mariscos_next_id') || '1');
-let invoiceHistory = JSON.parse(localStorage.getItem('mariscos_invoices') || '[]');
-
-// Variables para paginación
-let currentProductPage = 1;
-let currentSalesPage = 1;
-const itemsPerPage = 12;
-const invoicesPerPage = 20;
-
-// Configuración de mantenimiento
-let maintenanceConfig = JSON.parse(localStorage.getItem('mariscos_maintenance_config') || JSON.stringify({
-    maxInvoices: 1000,
-    autoCleanupEnabled: true,
-    lastCleanup: null
-}));
-
-// Función para calcular uso de localStorage
-function getStorageUsage() {
-    let total = 0;
-    for (let key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-            total += localStorage[key].length + key.length;
-        }
-    }
-    return Math.round(total / 1024);
-}
-
-// Función para actualizar monitor de almacenamiento
-function updateStorageMonitor() {
-    const used = getStorageUsage();
-    const limit = 5120;
-    const percentage = Math.round((used / limit) * 100);
-    
-    document.getElementById('storageUsed').textContent = used;
-    document.getElementById('storageLimit').textContent = limit;
-    document.getElementById('storagePercent').textContent = percentage + '%';
-    document.getElementById('totalRecords').textContent = products.length + invoiceHistory.length;
-    document.getElementById('totalProducts').textContent = products.length;
-    document.getElementById('totalInvoices').textContent = invoiceHistory.length;
-    
-    const fill = document.getElementById('storageFill');
-    fill.style.width = percentage + '%';
-    fill.className = 'storage-fill';
-    
-    if (percentage > 80) {
-        fill.classList.add('danger');
-        if (maintenanceConfig.autoCleanupEnabled) {
-            showStorageWarning();
-        }
-    } else if (percentage > 60) {
-        fill.classList.add('warning');
-    }
-}
-
-// Función para mostrar advertencia de almacenamiento
-function showStorageWarning() {
-    if (getStorageUsage() > 4096) {
-        showAlert('⚠️ Almacenamiento casi lleno. Se recomienda realizar limpieza automática.', 'warning');
-    }
-}
-
-// Función para mostrar alertas
-function showAlert(message, type) {
-    const existingAlert = document.querySelector('.alert');
-    if (existingAlert) {
-        existingAlert.remove();
-    }
-    
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type}`;
-    alert.textContent = message;
-    
-    const targetContainer = isLoggedIn ? 
-        document.querySelector('#mainSystem .container') : 
-        document.querySelector('.login-container');
-    
-    if (targetContainer) {
-        if (isLoggedIn) {
-            targetContainer.insertBefore(alert, targetContainer.firstChild);
-        } else {
-            targetContainer.appendChild(alert);
-        }
-        
-        setTimeout(() => {
-            alert.remove();
-        }, 5000);
-    }
-}
-
-// ============================================
-// NUEVAS FUNCIONES DE RECUPERACIÓN DE CONTRASEÑA
-// ============================================
-
-function showPasswordRecovery() {
-    document.getElementById('loginForm').style.display = 'none';
-    document.getElementById('recoveryForm').style.display = 'block';
-}
-
-function cancelRecovery() {
-    document.getElementById('loginForm').style.display = 'block';
-    document.getElementById('recoveryForm').style.display = 'none';
-    document.getElementById('recoveryUsername').value = '';
-    document.getElementById('securityAnswer').value = '';
-    const questionDiv = document.getElementById('securityQuestionDiv');
-    if (questionDiv) questionDiv.remove();
-}
-
-function checkRecoveryUser() {
-    const username = document.getElementById('recoveryUsername').value.trim();
-    
-    if (!username) {
-        showAlert('⚠️ Por favor ingresa tu nombre de usuario', 'danger');
-        return;
-    }
-    
-    if (!users[username]) {
-        showAlert('❌ Usuario no encontrado', 'danger');
-        return;
-    }
-    
-    const user = users[username];
-    const existingDiv = document.getElementById('securityQuestionDiv');
-    if (existingDiv) existingDiv.remove();
-    
-    const questionDiv = document.createElement('div');
-    questionDiv.id = 'securityQuestionDiv';
-    questionDiv.className = 'form-group';
-    questionDiv.innerHTML = `
-        <label>Pregunta de seguridad:</label>
-        <p style="font-style: italic; color: #555;">${user.securityQuestion}</p>
-        <input type="text" id="securityAnswer" placeholder="Tu respuesta" required>
-        <button type="button" class="btn" onclick="verifySecurityAnswer()">Verificar</button>
-    `;
-    
-    document.getElementById('recoveryForm').appendChild(questionDiv);
-}
-
-function verifySecurityAnswer() {
-    const username = document.getElementById('recoveryUsername').value.trim();
-    const answer = document.getElementById('securityAnswer').value.trim().toLowerCase();
-    
-    if (!answer) {
-        showAlert('⚠️ Por favor ingresa tu respuesta', 'danger');
-        return;
-    }
-    
-    const user = users[username];
-    
-    if (answer === user.securityAnswer.toLowerCase()) {
-        showAlert(`✅ Tu contraseña es: ${user.password}`, 'success');
-        setTimeout(() => {
-            cancelRecovery();
-        }, 5000);
-    } else {
-        showAlert('❌ Respuesta incorrecta', 'danger');
-    }
-}
-
-// ============================================
-// FIN NUEVAS FUNCIONES DE RECUPERACIÓN
-// ============================================
-
-// Función de login (MODIFICADA)
-function handleLogin(event) {
-    event.preventDefault();
-    
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value.trim();
-
-    if (users[username] && users[username].password === password) {
-        currentUser = username;
-        isLoggedIn = true;
-        localStorage.setItem('current_user', currentUser);
-        
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('mainSystem').classList.remove('hidden');
-        document.getElementById('currentUser').textContent = username;
-        
-        // NUEVA FUNCIONALIDAD: Ocultar pestaña de mantenimiento si no es Tuko
-        const maintenanceTab = document.querySelector('[data-tab="maintenance"]');
-        if (maintenanceTab) {
-            if (users[username].isAdmin) {
-                maintenanceTab.style.display = 'block';
-            } else {
-                maintenanceTab.style.display = 'none';
-            }
-        }
-        
-        showAlert('✅ Inicio de sesión exitoso', 'success');
-        initializeSystem();
-    } else {
-        showAlert('❌ Usuario o contraseña incorrectos', 'danger');
-    }
-}
-
-// Función de logout
-function handleLogout() {
-    if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-        currentUser = null;
-        isLoggedIn = false;
-        localStorage.removeItem('current_user');
-        
-        document.getElementById('loginScreen').classList.remove('hidden');
-        document.getElementById('mainSystem').classList.add('hidden');
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
-        
-        clearInvoice();
-    }
-}
-
-// Función para cambiar pestañas
-function showTab(tabName) {
-    document.querySelectorAll('.content').forEach(content => {
-        content.classList.add('hidden');
-    });
-    
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    
-    document.getElementById(tabName).classList.remove('hidden');
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-    
-    switch(tabName) {
-        case 'inventory':
-            displayProducts();
-            break;
-        case 'invoice':
-            updateInvoiceProductSelect();
-            break;
-        case 'reports':
-            updateReports();
-            break;
-        case 'sales-reports':
-            displaySalesReports();
-            break;
-        case 'maintenance':
-            updateMaintenanceStats();
-            break;
-    }
-}
-
-// Función para guardar productos
-function saveProducts() {
-    localStorage.setItem('mariscos_products', JSON.stringify(products));
-    localStorage.setItem('mariscos_next_id', nextProductId.toString());
-    updateStorageMonitor();
-}
-
-// Función para guardar facturas
-function saveInvoices() {
-    localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
-    updateStorageMonitor();
-}
-
-// Función para mostrar productos con paginación
-function displayProducts() {
-    const grid = document.getElementById('productGrid');
-    const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
-    
-    let filteredProducts = products;
-    if (searchTerm) {
-        filteredProducts = products.filter(product => 
-            product.name.toLowerCase().includes(searchTerm) ||
-            product.category.toLowerCase().includes(searchTerm)
-        );
-    }
-
-    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-    const startIndex = (currentProductPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const pageProducts = filteredProducts.slice(startIndex, endIndex);
-
-    grid.innerHTML = '';
-    
-    if (pageProducts.length === 0) {
-        grid.innerHTML = '<div class="product-card"><h3>📦 No hay productos</h3><p>Agrega productos usando la pestaña "Agregar Producto".</p></div>';
-        document.getElementById('productsPagination').style.display = 'none';
-        return;
-    }
-    
-    pageProducts.forEach(product => {
-        const stockClass = product.stock < 10 ? 'stock-low' : 'stock-ok';
-        const stockIcon = product.stock < 10 ? '⚠️' : '✅';
-        
-        const productCard = document.createElement('div');
-        productCard.className = 'product-card';
-        productCard.innerHTML = `
-            <div class="product-name">${product.name}</div>
-            <div class="product-info">📂 Categoría: ${product.category}</div>
-            <div class="product-info">💰 Precio: ₡${product.price.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / ${product.unit}</div>
-            <div class="product-info ${stockClass}">${stockIcon} Stock: ${product.stock} ${product.unit}</div>
-            <div class="action-buttons">
-                <button class="btn btn-sm" onclick="editProduct(${product.id})">✏️ Editar</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.id})">🗑️ Eliminar</button>
-            </div>
-        `;
-        grid.appendChild(productCard);
-    });
-
-    if (totalPages > 1) {
-        document.getElementById('productsPagination').style.display = 'flex';
-        document.getElementById('productPageInfo').textContent = `Página ${currentProductPage} de ${totalPages}`;
-        
-        const prevBtn = document.querySelector('#productsPagination button:first-child');
-        const nextBtn = document.querySelector('#productsPagination button:last-child');
-        
-        prevBtn.disabled = currentProductPage === 1;
-        nextBtn.disabled = currentProductPage === totalPages;
-    } else {
-        document.getElementById('productsPagination').style.display = 'none';
-    }
-}
-
-// Función para cambiar página de productos
-function changeProductPage(direction) {
-    const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
-    let filteredProducts = products;
-    if (searchTerm) {
-        filteredProducts = products.filter(product => 
-            product.name.toLowerCase().includes(searchTerm) ||
-            product.category.toLowerCase().includes(searchTerm)
-        );
-    }
-    
-    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-    
-    currentProductPage += direction;
-    if (currentProductPage < 1) currentProductPage = 1;
-    if (currentProductPage > totalPages) currentProductPage = totalPages;
-    
-    displayProducts();
-}
-
-// Función para buscar productos
-function searchProducts() {
-    currentProductPage = 1;
-    displayProducts();
-}
-
-// Función para agregar producto
-function handleAddProduct(event) {
-    event.preventDefault();
-    
-    const name = document.getElementById('productName').value.trim();
-    const category = document.getElementById('productCategory').value;
-    const price = parseFloat(document.getElementById('productPrice').value);
-    const stock = parseInt(document.getElementById('productStock').value);
-    const unit = document.getElementById('productUnit').value;
-    
-    if (!name || !category || !price || !stock || !unit) {
-        showAlert('⚠️ Por favor completa todos los campos', 'danger');
-        return;
-    }
-    
-    if (products.length >= 1000) {
-        showAlert('⚠️ Límite de productos alcanzado. Considera usar la función de mantenimiento.', 'warning');
-        return;
-    }
-    
-    const newProduct = {
-        id: nextProductId++,
-        name,
-        category,
-        price,
-        stock,
-        unit,
-        createdAt: new Date().toISOString()
-    };
-    
-    products.push(newProduct);
-    saveProducts();
-    
-    document.getElementById('addProductForm').reset();
-    showAlert('✅ Producto agregado exitosamente', 'success');
-    showTab('inventory');
-}
-
-// Función para editar producto
-function editProduct(id) {
-    const product = products.find(p => p.id === id);
-    if (!product) return;
-    
-    const newPrice = prompt(`💰 Nuevo precio para ${product.name}:`, product.price);
-    const newStock = prompt(`📦 Nuevo stock para ${product.name}:`, product.stock);
-    
-    if (newPrice !== null && newStock !== null) {
-        product.price = parseFloat(newPrice) || product.price;
-        product.stock = parseInt(newStock) || product.stock;
-        product.updatedAt = new Date().toISOString();
-        saveProducts();
-        displayProducts();
-        showAlert('✅ Producto actualizado exitosamente', 'success');
-    }
-}
-
-// Función para eliminar producto
-function deleteProduct(id) {
-    const product = products.find(p => p.id === id);
-    if (!product) return;
-    
-    if (confirm(`¿Estás seguro de que quieres eliminar "${product.name}"?\n\nEsta acción no se puede deshacer.`)) {
-        products = products.filter(p => p.id !== id);
-        saveProducts();
-        displayProducts();
-        showAlert('🗑️ Producto eliminado exitosamente', 'success');
-    }
-}
-
-// Función para actualizar select de productos en facturación
-function updateInvoiceProductSelect() {
-    const select = document.getElementById('invoiceProduct');
-    select.innerHTML = '<option value="">Seleccionar producto</option>';
-    
-    products.forEach(product => {
-        if (product.stock > 0) {
-            const option = document.createElement('option');
-            option.value = product.id;
-            option.textContent = `${product.name} - ₡${product.price.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / ${product.unit} (Stock: ${product.stock})`;
-            select.appendChild(option);
-        }
-    });
-}
-
-// Función para agregar producto a la factura
-function addToInvoice() {
-    const productId = parseInt(document.getElementById('invoiceProduct').value);
-    const quantity = parseFloat(document.getElementById('invoiceQuantity').value);
-    
-    if (!productId || !quantity || quantity <= 0) {
-        showAlert('⚠️ Por favor selecciona un producto y cantidad válida', 'danger');
-        return;
-    }
-    
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-    
-    if (quantity > product.stock) {
-        showAlert(`⚠️ Stock insuficiente. Stock disponible: ${product.stock} ${product.unit}`, 'danger');
-        return;
-    }
-    
-    const existingItem = invoiceItems.find(item => item.productId === productId);
-    if (existingItem) {
-        if (existingItem.quantity + quantity > product.stock) {
-            showAlert(`⚠️ Stock insuficiente. Stock disponible: ${product.stock} ${product.unit}`, 'danger');
-            return;
-        }
-        existingItem.quantity += quantity;
-        existingItem.total = existingItem.quantity * existingItem.price;
-    } else {
-        invoiceItems.push({
-            productId,
-            name: product.name,
-            price: product.price,
-            quantity,
-            unit: product.unit,
-            total: product.price * quantity
-        });
-    }
-    
-    document.getElementById('invoiceProduct').value = '';
-    document.getElementById('invoiceQuantity').value = '';
-    
-    updateInvoiceDisplay();
-}
-
-// Función para actualizar la visualización de la factura
-function updateInvoiceDisplay() {
-    const itemsContainer = document.getElementById('invoiceItems');
-    const totalContainer = document.getElementById('invoiceTotal');
-    
-    itemsContainer.innerHTML = '';
-    let total = 0;
-    
-    invoiceItems.forEach((item, index) => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'invoice-item';
-        itemDiv.innerHTML = `
-            <div>
-                <strong>${item.name}</strong><br>
-                ${item.quantity} ${item.unit} × ₡${item.price.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-            </div>
-            <div>
-                ₡${item.total.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                <button class="btn btn-danger btn-sm" onclick="removeFromInvoice(${index})">❌</button>
-            </div>
-        `;
-        itemsContainer.appendChild(itemDiv);
-        total += item.total;
-    });
-    
-    totalContainer.textContent = `Total: ₡${total.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-}
-
-// Función para remover item de la factura
-function removeFromInvoice(index) {
-    if (confirm('¿Eliminar este producto de la factura?')) {
-        invoiceItems.splice(index, 1);
-        updateInvoiceDisplay();
-        showAlert('🗑️ Producto eliminado de la factura', 'success');
-    }
-}
-
-// Función para limpiar factura
-function clearInvoice() {
-    if (invoiceItems.length > 0 && !confirm('¿Estás seguro de que quieres limpiar toda la factura?')) {
-        return;
-    }
-    
-    invoiceItems = [];
-    document.getElementById('clientName').value = '';
-    document.getElementById('clientPhone').value = '';
-    document.getElementById('clientAddress').value = '';
-    updateInvoiceDisplay();
-    
-    if (invoiceItems.length === 0) {
-        showAlert('🗑️ Factura limpiada', 'info');
-    }
-}
-
-// Función para generar PDF de la factura
-function generateInvoicePDF() {
-    if (invoiceItems.length === 0) {
-        showAlert('⚠️ No hay productos en la factura', 'danger');
-        return;
-    }
-    
-    if (invoiceHistory.length >= maintenanceConfig.maxInvoices) {
-        if (confirm('Se ha alcanzado el límite de facturas. ¿Desea continuar? Se recomienda hacer limpieza de datos.')) {
-            showAlert('⚠️ Sistema cerca del límite. Visite la sección de Mantenimiento.', 'warning');
-        } else {
-            return;
-        }
-    }
-    
-    const clientName = document.getElementById('clientName').value || 'Cliente';
-    const clientPhone = document.getElementById('clientPhone').value || 'N/A';
-    const clientAddress = document.getElementById('clientAddress').value || 'N/A';
-    
-    const invoiceNumber = `FAC-${new Date().getFullYear()}-${String(invoiceHistory.length + 1).padStart(4, '0')}`;
-    const now = new Date();
-    
-    invoiceItems.forEach(item => {
-        const product = products.find(p => p.id === item.productId);
-        if (product) {
-            product.stock -= item.quantity;
-        }
-    });
-    saveProducts();
-    
-    const invoice = {
-        number: invoiceNumber,
-        date: now.toLocaleDateString('es-CR'),
-        time: now.toLocaleTimeString('es-CR'),
-        fullDateTime: now.toISOString(),
-        client: { name: clientName, phone: clientPhone, address: clientAddress },
-        items: [...invoiceItems],
-        total: invoiceItems.reduce((sum, item) => sum + item.total, 0),
-        user: currentUser
-    };
-    invoiceHistory.push(invoice);
-    saveInvoices();
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.text('🦐 Mariscos Gómez', 20, 20);
-    doc.setFontSize(12);
-    doc.text('Sistema de Facturación', 20, 30);
-    
-    doc.text(`Fecha: ${invoice.date}`, 150, 20);
-    doc.text(`Hora: ${invoice.time}`, 150, 30);
-    doc.text(`Factura #${invoiceNumber}`, 150, 40);
-    
-    doc.setFontSize(14);
-    doc.text('Datos del Cliente:', 20, 60);
-    doc.setFontSize(11);
-    doc.text(`Nombre: ${clientName}`, 20, 70);
-    doc.text(`Teléfono: ${clientPhone}`, 20, 80);
-    doc.text(`Dirección: ${clientAddress}`, 20, 90);
-    
-    doc.setFontSize(14);
-    doc.text('Productos:', 20, 110);
-    
-    let y = 120;
-    let total = 0;
-    
-    invoiceItems.forEach(item => {
-        doc.setFontSize(10);
-        doc.text(`${item.name}`, 20, y);
-        doc.text(`${item.quantity} ${item.unit} × CRC ${item.price.toLocaleString('es-CR')}`, 100, y);
-        doc.text(`CRC ${item.total.toLocaleString('es-CR')}`, 170, y);
-        y += 10;
-        total += item.total;
-    });
-    
-    doc.setFontSize(14);
-    doc.text(`TOTAL: CRC ${total.toLocaleString('es-CR')}`, 150, y + 10);
-    
-    doc.setFontSize(10);
-    doc.text('¡Gracias por su compra!', 20, y + 30);
-    doc.text(`Atendido por: ${currentUser}`, 20, y + 40);
-    
-    doc.save(`factura_${clientName.replace(/\s+/g, '_')}_${invoiceNumber}.pdf`);
-    
-    showAlert('📄 Factura PDF generada exitosamente', 'success');
-    clearInvoice();
-    updateInvoiceProductSelect();
-    
-    if (maintenanceConfig.autoCleanupEnabled && getStorageUsage() > 4096) {
-        setTimeout(() => {
-            if (confirm('El sistema ha detectado que el almacenamiento está casi lleno. ¿Desea realizar una limpieza automática?')) {
-                optimizeStorage();
-            }
-        }, 2000);
-    }
-}
-
-// Función para actualizar reportes generales
-function updateReports() {
-    const totalProductsCount = products.length;
-    const lowStockProducts = products.filter(p => p.stock < 10).length;
-    const totalValue = products.reduce((sum, product) => sum + (product.price * product.stock), 0);
-    const totalInvoicesCount = invoiceHistory.length;
-    const totalSales = invoiceHistory.reduce((sum, invoice) => sum + invoice.total, 0);
-    
-    document.getElementById('totalProductsStat').textContent = totalProductsCount;
-    document.getElementById('lowStockProductsStat').textContent = lowStockProducts;
-    document.getElementById('totalInventoryValueStat').textContent = totalValue.toLocaleString('es-CR', {minimumFractionDigits: 0});
-    document.getElementById('totalInvoicesStat').textContent = totalInvoicesCount;
-    document.getElementById('totalSalesStat').textContent = totalSales.toLocaleString('es-CR', {minimumFractionDigits: 0});
-}
-
-// Función para mostrar reportes de ventas con paginación
-function displaySalesReports() {
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    document.getElementById('startDate').value = firstDayOfMonth.toISOString().split('T')[0];
-    document.getElementById('endDate').value = today.toISOString().split('T')[0];
-    
-    filterSales();
-}
-
-// Función para filtrar ventas
-function filterSales() {
-    currentSalesPage = 1;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    
-    let filteredInvoices = [...invoiceHistory];
-    
-    if (startDate || endDate) {
-        filteredInvoices = invoiceHistory.filter(invoice => {
-            const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-            const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-            const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mariscos Gómez - Sistema de Inventario</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Pantalla de Login -->
+    <div id="loginScreen">
+        <div class="login-container">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #2c3e50;">🦐 Acceso al Sistema</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">👤 Usuario:</label>
+                    <input type="text" id="username" required placeholder="Ingresa tu usuario">
+                </div>
+                <div class="form-group">
+                    <label for="password">🔒 Contraseña:</label>
+                    <input type="password" id="password" required placeholder="Ingresa tu contraseña">
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">🚀 Iniciar Sesión</button>
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="#" onclick="showPasswordRecovery(); return false;" style="color: #3498db; text-decoration: none; font-size: 0.9em;">🔑 ¿Olvidaste tu contraseña?</a>
+                </div>
+            </form>
             
-            return invoiceDate >= start && invoiceDate <= end;
-        });
-    }
-    
-    updateSalesTable(filteredInvoices);
-    updatePeriodSummary(filteredInvoices);
-}
-
-// Función para cambiar página de ventas
-function changeSalesPage(direction) {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    
-    let filteredInvoices = [...invoiceHistory];
-    
-    if (startDate || endDate) {
-        filteredInvoices = invoiceHistory.filter(invoice => {
-            const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-            const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-            const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
+            <!-- NUEVO: Formulario de Recuperación de Contraseña -->
+            <form id="recoveryForm" style="display: none;">
+                <h3 style="text-align: center; color: #2c3e50; margin-bottom: 20px;">🔑 Recuperar Contraseña</h3>
+                <div class="form-group">
+                    <label for="recoveryUsername">👤 Usuario:</label>
+                    <input type="text" id="recoveryUsername" required placeholder="Ingresa tu usuario">
+                </div>
+                <button type="button" class="btn" onclick="checkRecoveryUser()" style="width: 100%;">Siguiente</button>
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="#" onclick="cancelRecovery(); return false;" style="color: #95a5a6; text-decoration: none; font-size: 0.9em;">← Volver al inicio de sesión</a>
+                </div>
+            </form>
             
-            return invoiceDate >= start && invoiceDate <= end;
-        });
-    }
-    
-    const totalPages = Math.ceil(filteredInvoices.length / invoicesPerPage);
-    
-    currentSalesPage += direction;
-    if (currentSalesPage < 1) currentSalesPage = 1;
-    if (currentSalesPage > totalPages) currentSalesPage = totalPages;
-    
-    updateSalesTable(filteredInvoices);
-    updatePeriodSummary(filteredInvoices);
-}
+            <!-- <div class="login-info">
+                <strong>📝 Credenciales de acceso:</strong><br>
+                <strong>Usuarios Disponibles:</strong> Gomez, Jafeth, Diana<br>
+            </div>-->
+        </div>
+    </div>
 
-// Función para limpiar filtros de fecha
-function clearDateFilter() {
-    document.getElementById('startDate').value = '';
-    document.getElementById('endDate').value = '';
-    filterSales();
-}
+    <!-- Sistema Principal -->
+    <div id="mainSystem" class="hidden">
+        <div class="user-info" id="userInfo">
+            👤 Usuario: <span id="currentUser"></span>
+            <button class="logout-btn" id="logoutBtn">🚪 Salir</button>
+        </div>
 
-// Función para actualizar tabla de ventas con paginación
-function updateSalesTable(invoices) {
-    const tbody = document.getElementById('salesTableBody');
-    tbody.innerHTML = '';
-    
-    if (invoices.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No hay ventas en el período seleccionado</td></tr>';
-        document.getElementById('salesPagination').style.display = 'none';
-        return;
-    }
-    
-    const totalPages = Math.ceil(invoices.length / invoicesPerPage);
-    const startIndex = (currentSalesPage - 1) * invoicesPerPage;
-    const endIndex = startIndex + invoicesPerPage;
-    const pageInvoices = invoices.slice(startIndex, endIndex).reverse();
-    
-    pageInvoices.forEach(invoice => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${invoice.number}</td>
-            <td>${invoice.date}</td>
-            <td>${invoice.time || 'N/A'}</td>
-            <td>${invoice.client.name}</td>
-            <td>${invoice.client.phone}</td>
-            <td>₡${invoice.total.toLocaleString('es-CR', {minimumFractionDigits: 2})}</td>
-            <td>
-                <button class="btn btn-sm" onclick="showInvoiceDetails('${invoice.number}')" title="Ver detalles">👁️</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${invoice.number}')" title="Eliminar factura">🗑️</button>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
+        <div class="container">
+            <!-- Monitor de Almacenamiento -->
+            <div class="storage-monitor" id="storageMonitor">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <span>💾 Uso de Almacenamiento: <span id="storageUsed">0</span>KB / <span id="storageLimit">5120</span>KB</span>
+                    <span id="storagePercent">0%</span>
+                </div>
+                <div class="storage-bar">
+                    <div class="storage-fill" id="storageFill"></div>
+                </div>
+                <div style="font-size: 0.8em; opacity: 0.9;">
+                    📊 <span id="totalRecords">0</span> registros totales • 
+                    🏷️ <span id="totalProducts">0</span> productos • 
+                    📄 <span id="totalInvoices">0</span> facturas
+                </div>
+            </div>
 
-    if (totalPages > 1) {
-        document.getElementById('salesPagination').style.display = 'flex';
-        document.getElementById('salesPageInfo').textContent = `Página ${currentSalesPage} de ${totalPages}`;
-        const prevBtn = document.querySelector('#salesPagination button:first-child');
-        const nextBtn = document.querySelector('#salesPagination button:last-child');
-        
-        prevBtn.disabled = currentSalesPage === 1;
-        nextBtn.disabled = currentSalesPage === totalPages;
-    } else {
-        document.getElementById('salesPagination').style.display = 'none';
-    }
-}
+            <div class="header">
+                <h1>🦐 Mariscos Gómez</h1>
+                <p>Sistema de Inventario y Facturación</p>
+                 <!--<div class="github-badge">📱 Jafeth Castellón Gómez - Optimizado</div>
+            </div>-->
 
-// Función para actualizar resumen del período
-function updatePeriodSummary(invoices) {
-    const totalSales = invoices.reduce((sum, invoice) => sum + invoice.total, 0);
-    const invoiceCount = invoices.length;
-    const averageAmount = invoiceCount > 0 ? totalSales / invoiceCount : 0;
-    
-    document.getElementById('periodTotalSales').textContent = totalSales.toLocaleString('es-CR', {minimumFractionDigits: 2});
-    document.getElementById('periodInvoiceCount').textContent = invoiceCount;
-    document.getElementById('averageInvoiceAmount').textContent = averageAmount.toLocaleString('es-CR', {minimumFractionDigits: 2});
-}
+            <div class="tabs">
+                <button class="tab active" data-tab="inventory">📦 Inventario</button>
+                <button class="tab" data-tab="add-product">➕ Agregar Producto</button>
+                <button class="tab" data-tab="invoice">🧾 Facturación</button>
+                <button class="tab" data-tab="reports">📊 Reportes</button>
+                <button class="tab" data-tab="sales-reports">📈 Reportes de Ventas</button>
+                <button class="tab" data-tab="maintenance">🔧 Mantenimiento</button>
+            </div>
 
-// Función para mostrar detalles de factura
-function showInvoiceDetails(invoiceNumber) {
-    const invoice = invoiceHistory.find(inv => inv.number === invoiceNumber);
-    if (!invoice) return;
-    
-    let details = `📄 Factura: ${invoice.number}\n`;
-    details += `📅 Fecha: ${invoice.date} ${invoice.time || ''}\n`;
-    details += `👤 Cliente: ${invoice.client.name}\n`;
-    details += `📞 Teléfono: ${invoice.client.phone}\n`;
-    details += `📍 Dirección: ${invoice.client.address}\n\n`;
-    details += `📦 Productos:\n`;
-    
-    invoice.items.forEach(item => {
-        details += `• ${item.name}: ${item.quantity} ${item.unit} × ₡${item.price.toLocaleString('es-CR')} = ₡${item.total.toLocaleString('es-CR')}\n`;
-    });
-    
-    details += `\n💰 Total: ₡${invoice.total.toLocaleString('es-CR')}`;
-    if (invoice.user) {
-        details += `\n👤 Atendido por: ${invoice.user}`;
-    }
-    
-    alert(details);
-}
+            <!-- Inventario -->
+            <div id="inventory" class="content">
+                <h2>📦 Inventario de Productos</h2>
+                <input type="text" class="search-box" id="searchProducts" placeholder="🔍 Buscar productos...">
+                
+                <!-- Paginación de productos -->
+                <div class="pagination" id="productsPagination" style="display: none;">
+                    <button onclick="changeProductPage(-1)">« Anterior</button>
+                    <span id="productPageInfo">Página 1 de 1</span>
+                    <button onclick="changeProductPage(1)">Siguiente »</button>
+                </div>
 
-// Nueva función para eliminar factura
-function deleteInvoice(invoiceNumber) {
-    const invoiceIndex = invoiceHistory.findIndex(inv => inv.number === invoiceNumber);
-    if (invoiceIndex === -1) {
-        showAlert('⚠️ Factura no encontrada', 'danger');
-        return;
-    }
-    
-    const invoice = invoiceHistory[invoiceIndex];
-    
-    const confirmMessage = `⚠️ ELIMINAR FACTURA\n\nFactura: ${invoice.number}\nCliente: ${invoice.client.name}\nTotal: ₡${invoice.total.toLocaleString('es-CR')}\nFecha: ${invoice.date}\n\n¿Estás seguro de eliminar esta factura?\n\nEsta acción restaurará el stock de los productos vendidos y eliminará permanentemente la factura del sistema.`;
-    
-    if (!confirm(confirmMessage)) {
-        return;
-    }
-    
-    // Restaurar stock de productos
-    invoice.items.forEach(item => {
-        const product = products.find(p => p.id === item.productId);
-        if (product) {
-            product.stock += item.quantity;
-            product.updatedAt = new Date().toISOString();
-        }
-    });
-    
-    // Eliminar factura del historial
-    invoiceHistory.splice(invoiceIndex, 1);
-    
-    // Guardar cambios
-    saveProducts();
-    saveInvoices();
-    
-    showAlert(`✅ Factura ${invoice.number} eliminada exitosamente. Stock restaurado.`, 'success');
-    
-    // Actualizar la vista actual
-    filterSales();
-    updateReports();
-}
+                <div id="productGrid" class="product-grid"></div>
+            </div>
 
-// Funciones de exportación
-function exportSalesToPDF() {
-    const filteredInvoices = getFilteredInvoices();
-    
-    if (filteredInvoices.length === 0) {
-        showAlert('⚠️ No hay datos para exportar', 'danger');
-        return;
-    }
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    doc.setFontSize(18);
-    doc.text('Mariscos Gómez', 20, 20);
-    doc.setFontSize(14);
-    doc.text('Reporte de Ventas', 20, 30);
-    
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const periodText = startDate && endDate ? 
-        `Período: ${startDate} a ${endDate}` : 
-        'Período: Todas las ventas';
-    
-    doc.setFontSize(10);
-    doc.text(periodText, 20, 40);
-    doc.text(`Generado: ${new Date().toLocaleString('es-CR')}`, 20, 50);
-    doc.text(`Por: ${currentUser}`, 20, 60);
-    
-    const totalSales = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
-    doc.setFontSize(12);
-    doc.text(`Total de Facturas: ${filteredInvoices.length}`, 20, 80);
-    doc.text(`Total Vendido: ₡${totalSales.toLocaleString('es-CR')}`, 20, 90);
-    
-    const tableData = filteredInvoices.map(invoice => [
-        invoice.number,
-        invoice.date,
-        invoice.time || 'N/A',
-        invoice.client.name,
-        `₡${invoice.total.toLocaleString('es-CR')}`
-    ]);
-    
-    doc.autoTable({
-        head: [['# Factura', 'Fecha', 'Hora', 'Cliente', 'Total']],
-        body: tableData,
-        startY: 100,
-        theme: 'striped',
-        headStyles: { fillColor: [52, 152, 219] },
-        styles: { fontSize: 8 }
-    });
-    
-    const fileName = startDate && endDate ? 
-        `reporte_ventas_${startDate}_${endDate}.pdf` : 
-        `reporte_ventas_completo.pdf`;
-    
-    doc.save(fileName);
-    showAlert('📄 Reporte PDF exportado exitosamente', 'success');
-}
+            <!-- Agregar Producto -->
+            <div id="add-product" class="content hidden">
+                <h2>➕ Agregar Nuevo Producto</h2>
+                <form id="addProductForm">
+                    <div class="form-group">
+                        <label for="productName">Nombre del Producto:</label>
+                        <input type="text" id="productName" required placeholder="Ej: Camarones Frescos">
+                    </div>
+                    <div class="form-group">
+                        <label for="productCategory">Categoría:</label>
+                        <select id="productCategory" required>
+                            <option value="">Seleccionar categoría</option>
+                            <option value="Pescados">Pescados</option>
+                            <option value="Mariscos">Mariscos</option>
+                            <option value="Crustáceos">Crustáceos</option>
+                            <option value="Moluscos">Moluscos</option>
+                            <option value="Productos Preparados">Productos Preparados</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="productPrice">Precio por Unidad/Kg (₡):</label>
+                        <input type="number" id="productPrice" step="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="productStock">Stock Inicial:</label>
+                        <input type="number" id="productStock" required placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="productUnit">Unidad de Medida:</label>
+                        <select id="productUnit" required>
+                            <option value="">Seleccionar unidad</option>
+                            <option value="Kg">Kilogramos</option>
+                            <option value="Paquete">Paquete</option>
+                            <option value="Pza">Piezas</option>
+                            <option value="Caja">Cajas</option>
+                            <option value="Bolsa">Bolsa</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">✅ Agregar Producto</button>
+                </form>
+            </div>
 
-function exportSalesToExcel() {
-    const filteredInvoices = getFilteredInvoices();
-    
-    if (filteredInvoices.length === 0) {
-        showAlert('⚠️ No hay datos para exportar', 'danger');
-        return;
-    }
-    
-    const excelData = filteredInvoices.map(invoice => ({
-        'Número de Factura': invoice.number,
-        'Fecha': invoice.date,
-        'Hora': invoice.time || 'N/A',
-        'Cliente': invoice.client.name,
-        'Teléfono': invoice.client.phone,
-        'Dirección': invoice.client.address,
-        'Total': invoice.total,
-        'Atendido por': invoice.user || 'N/A'
-    }));
-    
-    const ws = XLSX.utils.json_to_sheet(excelData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Reporte de Ventas');
-    
-    const summary = [
-        ['RESUMEN DEL PERÍODO'],
-        [''],
-        ['Total de Facturas', filteredInvoices.length],
-        ['Total Vendido', filteredInvoices.reduce((sum, inv) => sum + inv.total, 0)],
-        ['Promedio por Factura', filteredInvoices.length > 0 ? filteredInvoices.reduce((sum, inv) => sum + inv.total, 0) / filteredInvoices.length : 0],
-        [''],
-        ['Generado por', currentUser],
-        ['Fecha de generación', new Date().toLocaleString('es-CR')]
-    ];
-    
-    const summaryWs = XLSX.utils.aoa_to_sheet(summary);
-    XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumen');
-    
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const fileName = startDate && endDate ? 
-        `reporte_ventas_${startDate}_${endDate}.xlsx` : 
-        `reporte_ventas_completo.xlsx`;
-    
-    XLSX.writeFile(wb, fileName);
-    showAlert('📊 Reporte Excel exportado exitosamente', 'success');
-}
+            <!-- Facturación -->
+            <div id="invoice" class="content hidden">
+                <h2>🧾 Sistema de Facturación</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h3>Datos del Cliente</h3>
+                        <div class="form-group">
+                            <label for="clientName">Nombre del Cliente:</label>
+                            <input type="text" id="clientName" placeholder="Nombre completo">
+                        </div>
+                        <div class="form-group">
+                            <label for="clientPhone">Teléfono:</label>
+                            <input type="tel" id="clientPhone" placeholder="0000-0000">
+                        </div>
+                        <div class="form-group">
+                            <label for="clientAddress">Dirección:</label>
+                            <input type="text" id="clientAddress" placeholder="Dirección completa">
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Seleccionar Productos</h3>
+                        <div class="form-group">
+                            <label for="invoiceProduct">Producto:</label>
+                            <select id="invoiceProduct">
+                                <option value="">Seleccionar producto</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="invoiceQuantity">Cantidad:</label>
+                            <input type="number" id="invoiceQuantity" step="0.1" placeholder="0">
+                        </div>
+                        <button type="button" class="btn" id="addToInvoiceBtn">➕ Agregar al Pedido</button>
+                    </div>
+                </div>
+                
+                <div class="invoice-section">
+                    <h3>📋 Resumen del Pedido</h3>
+                    <div id="invoiceItems"></div>
+                    <div id="invoiceTotal" class="invoice-total">Total: ₡0.00</div>
+                    <div class="action-buttons" style="text-align: center; margin-top: 20px;">
+                        <button class="btn btn-success" id="generatePDFBtn">📄 Generar Factura PDF</button>
+                        <button class="btn btn-danger" id="clearInvoiceBtn">🗑️ Limpiar Pedido</button>
+                    </div>
+                </div>
+            </div>
 
-function printSalesReport() {
-    const filteredInvoices = getFilteredInvoices();
-    
-    if (filteredInvoices.length === 0) {
-        showAlert('⚠️ No hay datos para imprimir', 'danger');
-        return;
-    }
-    
-    window.print();
-}
+            <!-- Reportes -->
+            <div id="reports" class="content hidden">
+                <h2>📊 Reportes y Estadísticas</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalProductsStat">0</div>
+                        <div>Total Productos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="lowStockProductsStat">0</div>
+                        <div>Stock Bajo</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">₡<span id="totalInventoryValueStat">0</span></div>
+                        <div>Valor Inventario</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalInvoicesStat">0</div>
+                        <div>Facturas Generadas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">₡<span id="totalSalesStat">0</span></div>
+                        <div>Total Vendido</div>
+                    </div>
+                </div>
+            </div>
 
-function getFilteredInvoices() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    
-    if (!startDate && !endDate) {
-        return [...invoiceHistory].reverse();
-    }
-    
-    return invoiceHistory.filter(invoice => {
-        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-        const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-        const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
-        
-        return invoiceDate >= start && invoiceDate <= end;
-    }).reverse();
-}
+            <!-- Reportes de Ventas -->
+            <div id="sales-reports" class="content hidden">
+                <h2>📈 Reportes Detallados de Ventas</h2>
+                
+                <div class="date-filter">
+                    <div class="form-group">
+                        <label for="startDate">📅 Fecha Inicio:</label>
+                        <input type="date" id="startDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="endDate">📅 Fecha Final:</label>
+                        <input type="date" id="endDate">
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn" id="filterSalesBtn">🔍 Filtrar</button>
+                        <button class="btn btn-warning" id="clearFilterBtn">🗑️ Limpiar</button>
+                    </div>
+                </div>
 
-// Nuevas funciones de mantenimiento
-function updateMaintenanceStats() {
-    const storageUsage = getStorageUsage();
-    const storageLimit = 5120;
-    const percentage = Math.round((storageUsage / storageLimit) * 100);
-    
-    // Calcular registros antiguos (más de 6 meses)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
-    const oldInvoices = invoiceHistory.filter(invoice => {
-        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-        return invoiceDate < sixMonthsAgo;
-    });
-    
-    // Calcular rendimiento del sistema basado en cantidad de datos
-    let performance = 100;
-    if (products.length > 500) performance -= 10;
-    if (invoiceHistory.length > 1000) performance -= 15;
-    if (storageUsage > 3000) performance -= 20;
-    if (storageUsage > 4000) performance -= 30;
-    
-    document.getElementById('storageUsagePercent').textContent = percentage + '%';
-    document.getElementById('oldRecordsCount').textContent = oldInvoices.length;
-    document.getElementById('systemPerformance').textContent = Math.max(performance, 0) + '%';
-    
-    // Actualizar alertas del sistema
-    updateSystemAlerts(percentage, oldInvoices.length, performance);
-    
-    // Cargar configuración
-    document.getElementById('maxInvoices').value = maintenanceConfig.maxInvoices;
-    document.getElementById('autoCleanupEnabled').checked = maintenanceConfig.autoCleanupEnabled;
-}
+                <div class="action-buttons" style="margin-bottom: 20px;">
+                    <button class="btn btn-success" id="exportPDFBtn">📄 Exportar PDF</button>
+                    <button class="btn btn-success" id="exportExcelBtn">📊 Exportar Excel</button>
+                    <button class="btn" id="printReportBtn">🖨️ Imprimir</button>
+                </div>
 
-function updateSystemAlerts(storagePercent, oldRecordsCount, performance) {
-    const alertsContainer = document.getElementById('systemAlerts');
-    alertsContainer.innerHTML = '';
-    
-    const alerts = [];
-    
-    if (storagePercent > 80) {
-        alerts.push({
-            type: 'danger',
-            message: '⚠️ Almacenamiento crítico (>80%). Se requiere limpieza inmediata.',
-            action: 'optimizeStorage'
-        });
-    } else if (storagePercent > 60) {
-        alerts.push({
-            type: 'warning',
-            message: '⚠️ Almacenamiento alto (>60%). Considera hacer limpieza.',
-            action: 'optimizeStorage'
-        });
-    }
-    
-    if (oldRecordsCount > 100) {
-        alerts.push({
-            type: 'info',
-            message: `📅 ${oldRecordsCount} facturas antiguas pueden ser archivadas.`,
-            action: 'archiveOldData'
-        });
-    }
-    
-    if (performance < 70) {
-        alerts.push({
-            type: 'warning',
-            message: '🐌 Rendimiento del sistema reducido. Se recomienda optimización.',
-            action: 'optimizeStorage'
-        });
-    }
-    
-    if (alerts.length === 0) {
-        alertsContainer.innerHTML = '<div class="alert alert-success">✅ Sistema funcionando correctamente</div>';
-        return;
-    }
-    
-    alerts.forEach(alert => {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${alert.type}`;
-        alertDiv.innerHTML = `
-            ${alert.message}
-            <button class="btn btn-sm" onclick="${alert.action}()" style="margin-left: 10px; padding: 5px 10px;">Resolver</button>
-        `;
-        alertsContainer.appendChild(alertDiv);
-    });
-}
+                <div class="product-card">
+                    <h3>📊 Resumen del Período</h3>
+                    <p><strong>Total de Ventas:</strong> ₡<span id="periodTotalSales">0.00</span></p>
+                    <p><strong>Facturas en el Período:</strong> <span id="periodInvoiceCount">0</span></p>
+                    <p><strong>Promedio por Factura:</strong> ₡<span id="averageInvoiceAmount">0.00</span></p>
+                </div>
 
-function archiveOldData() {
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
-    const oldInvoices = invoiceHistory.filter(invoice => {
-        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-        return invoiceDate < sixMonthsAgo;
-    });
-    
-    if (oldInvoices.length === 0) {
-        showAlert('ℹ️ No hay facturas antiguas para archivar', 'info');
-        return;
-    }
-    
-    if (!confirm(`¿Desea archivar ${oldInvoices.length} facturas antiguas? Se exportarán a Excel antes de eliminarlas.`)) {
-        return;
-    }
-    
-    // Exportar datos antiguos
-    const ws = XLSX.utils.json_to_sheet(oldInvoices.map(invoice => ({
-        'Número de Factura': invoice.number,
-        'Fecha': invoice.date,
-        'Hora': invoice.time || 'N/A',
-        'Cliente': invoice.client.name,
-        'Teléfono': invoice.client.phone,
-        'Dirección': invoice.client.address,
-        'Total': invoice.total,
-        'Atendido por': invoice.user || 'N/A'
-    })));
-    
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Facturas Archivadas');
-    
-    const fileName = `archivo_facturas_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    
-    // Remover facturas antiguas
-    invoiceHistory = invoiceHistory.filter(invoice => {
-        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-        return invoiceDate >= sixMonthsAgo;
-    });
-    
-    saveInvoices();
-    showAlert(`✅ ${oldInvoices.length} facturas archivadas y exportadas exitosamente`, 'success');
-    updateMaintenanceStats();
-}
+                <!-- Paginación para tabla de ventas -->
+                <div class="pagination" id="salesPagination" style="display: none;">
+                    <button onclick="changeSalesPage(-1)">« Anterior</button>
+                    <span id="salesPageInfo">Página 1 de 1</span>
+                    <button onclick="changeSalesPage(1)">Siguiente »</button>
+                </div>
 
-function exportAllData() {
-    const wb = XLSX.utils.book_new();
-    
-    // Hoja de productos
-    const productsWs = XLSX.utils.json_to_sheet(products);
-    XLSX.utils.book_append_sheet(wb, productsWs, 'Productos');
-    
-    // Hoja de facturas
-    const invoicesData = invoiceHistory.map(invoice => ({
-        'Número': invoice.number,
-        'Fecha': invoice.date,
-        'Hora': invoice.time || 'N/A',
-        'Cliente': invoice.client.name,
-        'Teléfono': invoice.client.phone,
-        'Dirección': invoice.client.address,
-        'Total': invoice.total,
-        'Usuario': invoice.user || 'N/A'
-    }));
-    const invoicesWs = XLSX.utils.json_to_sheet(invoicesData);
-    XLSX.utils.book_append_sheet(wb, invoicesWs, 'Facturas');
-    
-    // Hoja de resumen
-    const summary = [
-        ['BACKUP COMPLETO - MARISCOS GÓMEZ'],
-        [''],
-        ['Fecha de backup', new Date().toLocaleString('es-CR')],
-        ['Usuario', currentUser],
-        [''],
-        ['ESTADÍSTICAS'],
-        ['Total productos', products.length],
-        ['Total facturas', invoiceHistory.length],
-        ['Uso de almacenamiento (KB)', getStorageUsage()],
-        [''],
-        ['CONFIGURACIÓN'],
-        ['Máximo facturas', maintenanceConfig.maxInvoices],
-        ['Limpieza automática', maintenanceConfig.autoCleanupEnabled ? 'Habilitada' : 'Deshabilitada']
-    ];
-    const summaryWs = XLSX.utils.aoa_to_sheet(summary);
-    XLSX.utils.book_append_sheet(wb, summaryWs, 'Información');
-    
-    const fileName = `backup_completo_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    
-    showAlert('💾 Backup completo exportado exitosamente', 'success');
-}
+                <div class="table-wrapper">
+                    <table class="sales-table" id="salesTable">
+                        <thead>
+                            <tr>
+                                <th>📄 # Factura</th>
+                                <th>📅 Fecha</th>
+                                <th>🕐 Hora</th>
+                                <th>👤 Cliente</th>
+                                <th>📞 Teléfono</th>
+                                <th>💰 Total</th>
+                                <th>🔍 Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-function optimizeStorage() {
-    const initialUsage = getStorageUsage();
-    
-    // Limpiar datos duplicados y optimizar estructura
-    const uniqueProducts = [];
-    const productNames = new Set();
-    
-    products.forEach(product => {
-        const key = `${product.name}-${product.category}`;
-        if (!productNames.has(key)) {
-            productNames.add(key);
-            uniqueProducts.push(product);
-        }
-    });
-    
-    const removedProducts = products.length - uniqueProducts.length;
-    products = uniqueProducts;
-    
-    // Optimizar facturas eliminando campos innecesarios
-    invoiceHistory = invoiceHistory.map(invoice => ({
-        number: invoice.number,
-        date: invoice.date,
-        time: invoice.time,
-        fullDateTime: invoice.fullDateTime,
-        client: invoice.client,
-        items: invoice.items.map(item => ({
-            productId: item.productId,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            unit: item.unit,
-            total: item.total
-        })),
-        total: invoice.total,
-        user: invoice.user
-    }));
-    
-    saveProducts();
-    saveInvoices();
-    
-    const finalUsage = getStorageUsage();
-    const saved = initialUsage - finalUsage;
-    
-    showAlert(`⚡ Optimización completada. Espacio liberado: ${saved}KB. Productos duplicados removidos: ${removedProducts}`, 'success');
-    updateStorageMonitor();
-    updateMaintenanceStats();
-}
+            <!-- Nueva sección de Mantenimiento -->
+            <div id="maintenance" class="content hidden">
+                <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <button class="btn btn-info" id="btnSyncFirebase" onclick="syncWithFirebase()">☁️ Sincronizar con Firebase</button>
+                    <button class="btn btn-success" id="btnMigrateFirebase" onclick="migrateToFirebase()">📤 Migrar datos locales a Firebase</button>
+                </div>
 
-function clearOldInvoices() {
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    
-    const oldInvoices = invoiceHistory.filter(invoice => {
-        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-        return invoiceDate < threeMonthsAgo;
-    });
-    
-    if (oldInvoices.length === 0) {
-        showAlert('ℹ️ No hay facturas antiguas para eliminar', 'info');
-        return;
-    }
-    
-    if (!confirm(`⚠️ ADVERTENCIA: Esta acción eliminará permanentemente ${oldInvoices.length} facturas de más de 3 meses. ¿Continuar?`)) {
-        return;
-    }
-    
-    const totalSalesRemoved = oldInvoices.reduce((sum, inv) => sum + inv.total, 0);
-    
-    invoiceHistory = invoiceHistory.filter(invoice => {
-        const invoiceDate = new Date(invoice.fullDateTime || invoice.date);
-        return invoiceDate >= threeMonthsAgo;
-    });
-    
-    saveInvoices();
-    showAlert(`🗑️ ${oldInvoices.length} facturas eliminadas (₡${totalSalesRemoved.toLocaleString('es-CR')} en ventas)`, 'success');
-    updateMaintenanceStats();
-}
+                <h2>🔧 Mantenimiento del Sistema</h2>
+                
+                <div class="maintenance-section">
+                    <h3>📊 Estado del Sistema</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number" id="storageUsagePercent">0%</div>
+                            <div>Almacenamiento Usado</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="oldRecordsCount">0</div>
+                            <div>Registros Antiguos (>6 meses)</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="systemPerformance">100%</div>
+                            <div>Rendimiento del Sistema</div>
+                        </div>
+                    </div>
+                </div>
 
-function saveMaintenanceConfig() {
-    const maxInvoices = parseInt(document.getElementById('maxInvoices').value);
-    const autoCleanupEnabled = document.getElementById('autoCleanupEnabled').checked;
-    
-    if (maxInvoices < 100 || maxInvoices > 10000) {
-        showAlert('⚠️ El límite de facturas debe estar entre 100 y 10,000', 'danger');
-        return;
-    }
-    
-    maintenanceConfig = {
-        maxInvoices,
-        autoCleanupEnabled,
-        lastCleanup: new Date().toISOString()
-    };
-    
-    localStorage.setItem('mariscos_maintenance_config', JSON.stringify(maintenanceConfig));
-    showAlert('💾 Configuración de mantenimiento guardada', 'success');
-    updateMaintenanceStats();
-}
+                <div class="maintenance-section">
+                    <h3>⚠️ Alertas del Sistema</h3>
+                    <div id="systemAlerts">
+                        <!-- Las alertas se mostrarán aquí dinámicamente -->
+                    </div>
+                </div>
 
-// Función para inicializar el sistema
-function initializeSystem() {
-    updateStorageMonitor();
-    displayProducts();
-    updateReports();
-    
-    // Verificar si es necesaria limpieza automática al inicio
-    if (maintenanceConfig.autoCleanupEnabled && getStorageUsage() > 4096) {
-        setTimeout(() => {
-            showAlert('🔧 Sistema requiere optimización. Visite la sección de Mantenimiento.', 'warning');
-        }, 3000);
-    }
-}
+                <div class="maintenance-section">
+                    <h3>🧹 Limpieza Automática</h3>
+                    <p>El sistema puede limpiar automáticamente datos antiguos para optimizar el rendimiento.</p>
+                    <div class="maintenance-buttons">
+                        <button class="btn btn-warning" onclick="archiveOldData()">📦 Archivar Datos Antiguos</button>
+                        <button class="btn btn-success" onclick="exportAllData()">💾 Backup Completo</button>
+                        <button class="btn btn-info" onclick="optimizeStorage()">⚡ Optimizar Almacenamiento</button>
+                        <button class="btn btn-danger" onclick="clearOldInvoices()">🗑️ Limpiar Facturas Antiguas</button>
+                    </div>
+                </div>
 
-// Función para verificar sesión automática (MODIFICADA)
-function checkAutoLogin() {
-    const savedUser = localStorage.getItem('current_user');
-    
-    // Verificar que el usuario aún exista en la lista
-    if (savedUser && !users[savedUser]) {
-        // El usuario fue eliminado - cerrar sesión
-        localStorage.removeItem('current_user');
-        showAlert('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.', 'warning');
-        return;
-    }
-    
-    if (savedUser && users[savedUser]) {
-        currentUser = savedUser;
-        isLoggedIn = true;
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('mainSystem').classList.remove('hidden');
-        document.getElementById('currentUser').textContent = savedUser;
-        
-        // NUEVA FUNCIONALIDAD: Ocultar pestaña de mantenimiento si no es admin
-        const maintenanceTab = document.querySelector('[data-tab="maintenance"]');
-        if (maintenanceTab) {
-            if (users[savedUser].isAdmin) {
-                maintenanceTab.style.display = 'block';
-            } else {
-                maintenanceTab.style.display = 'none';
-            }
-        }
-        
-        initializeSystem();
-    }
-}
+                <div class="maintenance-section">
+                    <h3>📈 Configuración de Límites</h3>
+                    <div class="form-group">
+                        <label for="maxInvoices">Máximo de Facturas a Conservar:</label>
+                        <input type="number" id="maxInvoices" value="1000" min="100" max="10000">
+                        <small>Recomendado: 1000-2000 facturas</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="autoCleanupEnabled">
+                            <input type="checkbox" id="autoCleanupEnabled"> 
+                            Activar limpieza automática
+                        </label>
+                        <small>Limpia automáticamente cuando el almacenamiento supera el 80%</small>
+                    </div>
+                    <button class="btn btn-success" onclick="saveMaintenanceConfig()">💾 Guardar Configuración</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-// Event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Cargar configuración de mantenimiento
-    maintenanceConfig = JSON.parse(localStorage.getItem('mariscos_maintenance_config') || JSON.stringify({
-        maxInvoices: 1000,
-        autoCleanupEnabled: true,
-        lastCleanup: null
-    }));
-    
-    checkAutoLogin();
-    
-    // Event listeners para el login
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-    
-    // Event listeners para las pestañas
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            showTab(this.dataset.tab);
-        });
-    });
-    
-    // Event listeners para productos
-    document.getElementById('addProductForm').addEventListener('submit', handleAddProduct);
-    document.getElementById('searchProducts').addEventListener('keyup', searchProducts);
-    
-    // Event listeners para facturación
-    document.getElementById('addToInvoiceBtn').addEventListener('click', addToInvoice);
-    document.getElementById('generatePDFBtn').addEventListener('click', generateInvoicePDF);
-    document.getElementById('clearInvoiceBtn').addEventListener('click', clearInvoice);
-    
-    // Event listeners para reportes de ventas
-    document.getElementById('filterSalesBtn').addEventListener('click', filterSales);
-    document.getElementById('clearFilterBtn').addEventListener('click', clearDateFilter);
-    document.getElementById('exportPDFBtn').addEventListener('click', exportSalesToPDF);
-    document.getElementById('exportExcelBtn').addEventListener('click', exportSalesToExcel);
-    document.getElementById('printReportBtn').addEventListener('click', printSalesReport);
-    
-    // Actualizar monitor de almacenamiento cada 30 segundos
-    setInterval(updateStorageMonitor, 30000);
-});
+    <script src="script.js"></script>
+    <script src="firebase-integration.js"></script>
+</body>
+</html>
