@@ -63,14 +63,12 @@ function updateStorageMonitor() {
     }
 }
 
-// Función para mostrar advertencia de almacenamiento
 function showStorageWarning() {
     if (getStorageUsage() > 4096) {
         showAlert('⚠️ Almacenamiento casi lleno. Se recomienda realizar limpieza automática.', 'warning');
     }
 }
 
-// Función para mostrar alertas
 function showAlert(message, type) {
     const existingAlert = document.querySelector('.alert');
     if (existingAlert) {
@@ -98,9 +96,8 @@ function showAlert(message, type) {
     }
 }
 
-// ============================================
-// NUEVAS FUNCIONES DE RECUPERACIÓN DE CONTRASEÑA
-// ============================================
+
+// FUNCIONES DE RECUPERACIÓN DE CONTRASEÑA
 
 function showPasswordRecovery() {
     document.getElementById('loginForm').style.display = 'none';
@@ -167,11 +164,6 @@ function verifySecurityAnswer() {
     }
 }
 
-// ============================================
-// FIN NUEVAS FUNCIONES DE RECUPERACIÓN
-// ============================================
-
-// Función de login (MODIFICADA)
 function handleLogin(event) {
     event.preventDefault();
     
@@ -187,7 +179,6 @@ function handleLogin(event) {
         document.getElementById('mainSystem').classList.remove('hidden');
         document.getElementById('currentUser').textContent = username;
         
-        // NUEVA FUNCIONALIDAD: Ocultar pestaña de mantenimiento si no es Tuko
         const maintenanceTab = document.querySelector('[data-tab="maintenance"]');
         if (maintenanceTab) {
             if (users[username].isAdmin) {
@@ -204,7 +195,6 @@ function handleLogin(event) {
     }
 }
 
-// Función de logout
 function handleLogout() {
     if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
         currentUser = null;
@@ -220,7 +210,6 @@ function handleLogout() {
     }
 }
 
-// Función para cambiar pestañas
 function showTab(tabName) {
     document.querySelectorAll('.content').forEach(content => {
         content.classList.add('hidden');
@@ -252,20 +241,17 @@ function showTab(tabName) {
     }
 }
 
-// Función para guardar productos
 function saveProducts() {
     localStorage.setItem('mariscos_products', JSON.stringify(products));
     localStorage.setItem('mariscos_next_id', nextProductId.toString());
     updateStorageMonitor();
 }
 
-// Función para guardar facturas
 function saveInvoices() {
     localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
     updateStorageMonitor();
 }
 
-// Función para mostrar productos con paginación
 function displayProducts() {
     const grid = document.getElementById('productGrid');
     const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
@@ -324,7 +310,6 @@ function displayProducts() {
     }
 }
 
-// Función para cambiar página de productos
 function changeProductPage(direction) {
     const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
     let filteredProducts = products;
@@ -344,13 +329,11 @@ function changeProductPage(direction) {
     displayProducts();
 }
 
-// Función para buscar productos
 function searchProducts() {
     currentProductPage = 1;
     displayProducts();
 }
 
-// Función para agregar producto
 function handleAddProduct(event) {
     event.preventDefault();
     
@@ -388,7 +371,6 @@ function handleAddProduct(event) {
     showTab('inventory');
 }
 
-// Función para editar producto
 function editProduct(id) {
     const product = products.find(p => p.id === id);
     if (!product) return;
@@ -406,7 +388,6 @@ function editProduct(id) {
     }
 }
 
-// Función para eliminar producto
 function deleteProduct(id) {
     const product = products.find(p => p.id === id);
     if (!product) return;
@@ -419,7 +400,6 @@ function deleteProduct(id) {
     }
 }
 
-// Función para actualizar select de productos en facturación
 function updateInvoiceProductSelect() {
     const select = document.getElementById('invoiceProduct');
     select.innerHTML = '<option value="">Seleccionar producto</option>';
@@ -434,7 +414,6 @@ function updateInvoiceProductSelect() {
     });
 }
 
-// Función para agregar producto a la factura
 function addToInvoice() {
     const productId = parseInt(document.getElementById('invoiceProduct').value);
     const quantity = parseFloat(document.getElementById('invoiceQuantity').value);
@@ -477,7 +456,6 @@ function addToInvoice() {
     updateInvoiceDisplay();
 }
 
-// Función para actualizar la visualización de la factura
 function updateInvoiceDisplay() {
     const itemsContainer = document.getElementById('invoiceItems');
     const totalContainer = document.getElementById('invoiceTotal');
@@ -505,7 +483,6 @@ function updateInvoiceDisplay() {
     totalContainer.textContent = `Total: ₡${total.toLocaleString('es-CR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
-// Función para remover item de la factura
 function removeFromInvoice(index) {
     if (confirm('¿Eliminar este producto de la factura?')) {
         invoiceItems.splice(index, 1);
@@ -514,7 +491,6 @@ function removeFromInvoice(index) {
     }
 }
 
-// Función para limpiar factura
 function clearInvoice() {
     if (invoiceItems.length > 0 && !confirm('¿Estás seguro de que quieres limpiar toda la factura?')) {
         return;
@@ -531,7 +507,125 @@ function clearInvoice() {
     }
 }
 
-// Función para generar PDF de la factura
+// FUNCIÓN PARA GENERAR VOUCHER (FORMATO PROFESIONAL 80MM)
+function generateInvoiceVoucherPDF(invoice) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+        unit: 'mm',
+        format: [80, 200]
+    });
+    
+    let yPos = 10;
+    const centerX = 40;
+    const margin = 5;
+    
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Mariscos Gomez', centerX, yPos, { align: 'center' });
+    
+    yPos += 6;
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text('Sistema de Facturacion', centerX, yPos, { align: 'center' });
+    
+    yPos += 8;
+    doc.line(margin, yPos, 80 - margin, yPos);
+    
+    yPos += 5;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Factura #${invoice.number}`, centerX, yPos, { align: 'center' });
+    
+    yPos += 5;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Fecha: ${invoice.date}`, centerX, yPos, { align: 'center' });
+    
+    yPos += 4;
+    doc.text(`Hora: ${invoice.time}`, centerX, yPos, { align: 'center' });
+    
+    yPos += 6;
+    doc.line(margin, yPos, 80 - margin, yPos);
+    
+    yPos += 5;
+    doc.setFont(undefined, 'bold');
+    doc.text('CLIENTE:', margin, yPos);
+    
+    yPos += 4;
+    doc.setFont(undefined, 'normal');
+    doc.text(`Nombre: ${invoice.client.name}`, margin, yPos);
+    
+    yPos += 4;
+    doc.text(`Tel: ${invoice.client.phone}`, margin, yPos);
+    
+    yPos += 4;
+    const maxWidth = 70;
+    const addressLines = doc.splitTextToSize(`Dir: ${invoice.client.address}`, maxWidth);
+    addressLines.forEach(line => {
+        doc.text(line, margin, yPos);
+        yPos += 4;
+    });
+    
+    yPos += 2;
+    doc.line(margin, yPos, 80 - margin, yPos);
+    
+    yPos += 5;
+    doc.setFont(undefined, 'bold');
+    doc.text('PRODUCTOS:', margin, yPos);
+    
+    yPos += 5;
+    doc.setFont(undefined, 'normal');
+    
+    invoice.items.forEach(item => {
+        const itemNameLines = doc.splitTextToSize(item.name, maxWidth);
+        itemNameLines.forEach(line => {
+            doc.text(line, margin, yPos);
+            yPos += 4;
+        });
+        
+        const precioFormat = item.price.toFixed(2);
+        const totalFormat = item.total.toFixed(2);
+        
+        doc.setFontSize(7);
+        doc.text(`  ${item.quantity} ${item.unit} x C${precioFormat}`, margin + 2, yPos);
+        doc.text(`C${totalFormat}`, 80 - margin, yPos, { align: 'right' });
+        
+        yPos += 5;
+        doc.setFontSize(8);
+    });
+    
+    yPos += 2;
+    doc.line(margin, yPos, 80 - margin, yPos);
+    
+    yPos += 6;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    const totalFormat = invoice.total.toFixed(2);
+    doc.text('TOTAL:', margin, yPos);
+    doc.text(`C${totalFormat}`, 80 - margin, yPos, { align: 'right' });
+    
+    yPos += 8;
+    doc.line(margin, yPos, 80 - margin, yPos);
+    
+    yPos += 5;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text('Gracias por su compra!', centerX, yPos, { align: 'center' });
+    
+    yPos += 4;
+    doc.setFontSize(7);
+    doc.text(`Atendido por: ${invoice.user || 'Sistema'}`, centerX, yPos, { align: 'center' });
+    
+    yPos += 4;
+    doc.text(new Date().toLocaleString('es-CR'), centerX, yPos, { align: 'center' });
+    
+    yPos += 6;
+    doc.text('--- FIN DEL COMPROBANTE ---', centerX, yPos, { align: 'center' });
+    
+    return doc;
+}
+
+// FUNCIÓN PARA GENERAR PDF AL CREAR FACTURA
 function generateInvoicePDF() {
     if (invoiceItems.length === 0) {
         showAlert('⚠️ No hay productos en la factura', 'danger');
@@ -574,48 +668,9 @@ function generateInvoicePDF() {
     invoiceHistory.push(invoice);
     saveInvoices();
     
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.text('🦐 Mariscos Gómez', 20, 20);
-    doc.setFontSize(12);
-    doc.text('Sistema de Facturación', 20, 30);
-    
-    doc.text(`Fecha: ${invoice.date}`, 150, 20);
-    doc.text(`Hora: ${invoice.time}`, 150, 30);
-    doc.text(`Factura #${invoiceNumber}`, 150, 40);
-    
-    doc.setFontSize(14);
-    doc.text('Datos del Cliente:', 20, 60);
-    doc.setFontSize(11);
-    doc.text(`Nombre: ${clientName}`, 20, 70);
-    doc.text(`Teléfono: ${clientPhone}`, 20, 80);
-    doc.text(`Dirección: ${clientAddress}`, 20, 90);
-    
-    doc.setFontSize(14);
-    doc.text('Productos:', 20, 110);
-    
-    let y = 120;
-    let total = 0;
-    
-    invoiceItems.forEach(item => {
-        doc.setFontSize(10);
-        doc.text(`${item.name}`, 20, y);
-        doc.text(`${item.quantity} ${item.unit} × CRC ${item.price.toLocaleString('es-CR')}`, 100, y);
-        doc.text(`CRC ${item.total.toLocaleString('es-CR')}`, 170, y);
-        y += 10;
-        total += item.total;
-    });
-    
-    doc.setFontSize(14);
-    doc.text(`TOTAL: CRC ${total.toLocaleString('es-CR')}`, 150, y + 10);
-    
-    doc.setFontSize(10);
-    doc.text('¡Gracias por su compra!', 20, y + 30);
-    doc.text(`Atendido por: ${currentUser}`, 20, y + 40);
-    
-    doc.save(`factura_${clientName.replace(/\s+/g, '_')}_${invoiceNumber}.pdf`);
+    // GENERAR VOUCHER PROFESIONAL
+    const doc = generateInvoiceVoucherPDF(invoice);
+    doc.save(`voucher_${clientName.replace(/\s+/g, '_')}_${invoiceNumber}.pdf`);
     
     showAlert('📄 Factura PDF generada exitosamente', 'success');
     clearInvoice();
@@ -630,7 +685,23 @@ function generateInvoicePDF() {
     }
 }
 
-// Función para actualizar reportes generales
+// FUNCIÓN PARA REIMPRIMIR VOUCHER
+function printInvoiceVoucher(invoiceNumber) {
+    const invoice = invoiceHistory.find(inv => inv.number === invoiceNumber);
+    if (!invoice) {
+        showAlert('⚠️ Factura no encontrada', 'danger');
+        return;
+    }
+    
+    const doc = generateInvoiceVoucherPDF(invoice);
+    doc.save(`voucher_${invoice.number}_${invoice.client.name.replace(/\s+/g, '_')}.pdf`);
+    
+    const modal = document.querySelector('[style*="position: fixed"]');
+    if (modal) modal.remove();
+    
+    showAlert('✅ Voucher generado exitosamente', 'success');
+}
+
 function updateReports() {
     const totalProductsCount = products.length;
     const lowStockProducts = products.filter(p => p.stock < 10).length;
@@ -645,7 +716,6 @@ function updateReports() {
     document.getElementById('totalSalesStat').textContent = totalSales.toLocaleString('es-CR', {minimumFractionDigits: 0});
 }
 
-// Función para mostrar reportes de ventas con paginación
 function displaySalesReports() {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -656,7 +726,6 @@ function displaySalesReports() {
     filterSales();
 }
 
-// Función para filtrar ventas
 function filterSales() {
     currentSalesPage = 1;
     const startDate = document.getElementById('startDate').value;
@@ -678,7 +747,6 @@ function filterSales() {
     updatePeriodSummary(filteredInvoices);
 }
 
-// Función para cambiar página de ventas
 function changeSalesPage(direction) {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
@@ -705,14 +773,12 @@ function changeSalesPage(direction) {
     updatePeriodSummary(filteredInvoices);
 }
 
-// Función para limpiar filtros de fecha
 function clearDateFilter() {
     document.getElementById('startDate').value = '';
     document.getElementById('endDate').value = '';
     filterSales();
 }
 
-// Función para actualizar tabla de ventas con paginación
 function updateSalesTable(invoices) {
     const tbody = document.getElementById('salesTableBody');
     tbody.innerHTML = '';
@@ -739,6 +805,7 @@ function updateSalesTable(invoices) {
             <td>₡${invoice.total.toLocaleString('es-CR', {minimumFractionDigits: 2})}</td>
             <td>
                 <button class="btn btn-sm" onclick="showInvoiceDetails('${invoice.number}')" title="Ver detalles">👁️</button>
+                <button class="btn btn-success btn-sm" onclick="printInvoiceVoucher('${invoice.number}')" title="Reimprimir voucher">🖨️</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${invoice.number}')" title="Eliminar factura">🗑️</button>
             </td>
         `;
@@ -758,7 +825,6 @@ function updateSalesTable(invoices) {
     }
 }
 
-// Función para actualizar resumen del período
 function updatePeriodSummary(invoices) {
     const totalSales = invoices.reduce((sum, invoice) => sum + invoice.total, 0);
     const invoiceCount = invoices.length;
@@ -769,31 +835,81 @@ function updatePeriodSummary(invoices) {
     document.getElementById('averageInvoiceAmount').textContent = averageAmount.toLocaleString('es-CR', {minimumFractionDigits: 2});
 }
 
-// Función para mostrar detalles de factura
 function showInvoiceDetails(invoiceNumber) {
     const invoice = invoiceHistory.find(inv => inv.number === invoiceNumber);
     if (!invoice) return;
     
-    let details = `📄 Factura: ${invoice.number}\n`;
-    details += `📅 Fecha: ${invoice.date} ${invoice.time || ''}\n`;
-    details += `👤 Cliente: ${invoice.client.name}\n`;
-    details += `📞 Teléfono: ${invoice.client.phone}\n`;
-    details += `📍 Dirección: ${invoice.client.address}\n\n`;
-    details += `📦 Productos:\n`;
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    `;
+    
+    let details = `<h3 style="text-align: center; color: #2c3e50;">📄 Factura ${invoice.number}</h3>`;
+    details += `<hr style="margin: 15px 0;">`;
+    details += `<p><strong>📅 Fecha:</strong> ${invoice.date} ${invoice.time || ''}</p>`;
+    details += `<p><strong>👤 Cliente:</strong> ${invoice.client.name}</p>`;
+    details += `<p><strong>📞 Teléfono:</strong> ${invoice.client.phone}</p>`;
+    details += `<p><strong>📍 Dirección:</strong> ${invoice.client.address}</p>`;
+    details += `<hr style="margin: 15px 0;">`;
+    details += `<p><strong>📦 Productos:</strong></p>`;
+    details += `<ul style="list-style: none; padding: 0;">`;
     
     invoice.items.forEach(item => {
-        details += `• ${item.name}: ${item.quantity} ${item.unit} × ₡${item.price.toLocaleString('es-CR')} = ₡${item.total.toLocaleString('es-CR')}\n`;
+        details += `<li style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+            <strong>${item.name}</strong><br>
+            ${item.quantity} ${item.unit} × ₡${item.price.toLocaleString('es-CR')} = 
+            <strong>₡${item.total.toLocaleString('es-CR')}</strong>
+        </li>`;
     });
     
-    details += `\n💰 Total: ₡${invoice.total.toLocaleString('es-CR')}`;
+    details += `</ul>`;
+    details += `<hr style="margin: 15px 0;">`;
+    details += `<p style="font-size: 1.2em; text-align: right;"><strong>💰 Total: ₡${invoice.total.toLocaleString('es-CR')}</strong></p>`;
+    
     if (invoice.user) {
-        details += `\n👤 Atendido por: ${invoice.user}`;
+        details += `<p style="text-align: center; color: #7f8c8d; font-size: 0.9em;">👤 Atendido por: ${invoice.user}</p>`;
     }
     
-    alert(details);
+    details += `<div style="display: flex; gap: 10px; margin-top: 20px; justify-content: center;">
+        <button onclick="printInvoiceVoucher('${invoice.number}')" class="btn btn-success" style="flex: 1;">
+            🖨️ Reimprimir Voucher
+        </button>
+        <button onclick="this.closest('[style*=\"position: fixed\"]').remove()" class="btn btn-warning" style="flex: 1;">
+            ❌ Cerrar
+        </button>
+    </div>`;
+    
+    modalContent.innerHTML = details;
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
 }
 
-// Nueva función para eliminar factura
 function deleteInvoice(invoiceNumber) {
     const invoiceIndex = invoiceHistory.findIndex(inv => inv.number === invoiceNumber);
     if (invoiceIndex === -1) {
@@ -809,7 +925,6 @@ function deleteInvoice(invoiceNumber) {
         return;
     }
     
-    // Restaurar stock de productos
     invoice.items.forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (product) {
@@ -818,21 +933,17 @@ function deleteInvoice(invoiceNumber) {
         }
     });
     
-    // Eliminar factura del historial
     invoiceHistory.splice(invoiceIndex, 1);
     
-    // Guardar cambios
     saveProducts();
     saveInvoices();
     
     showAlert(`✅ Factura ${invoice.number} eliminada exitosamente. Stock restaurado.`, 'success');
     
-    // Actualizar la vista actual
     filterSales();
     updateReports();
 }
 
-// Funciones de exportación
 function exportSalesToPDF() {
     const filteredInvoices = getFilteredInvoices();
     
@@ -965,13 +1076,11 @@ function getFilteredInvoices() {
     }).reverse();
 }
 
-// Nuevas funciones de mantenimiento
 function updateMaintenanceStats() {
     const storageUsage = getStorageUsage();
     const storageLimit = 5120;
     const percentage = Math.round((storageUsage / storageLimit) * 100);
     
-    // Calcular registros antiguos (más de 6 meses)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
@@ -980,7 +1089,6 @@ function updateMaintenanceStats() {
         return invoiceDate < sixMonthsAgo;
     });
     
-    // Calcular rendimiento del sistema basado en cantidad de datos
     let performance = 100;
     if (products.length > 500) performance -= 10;
     if (invoiceHistory.length > 1000) performance -= 15;
@@ -991,10 +1099,8 @@ function updateMaintenanceStats() {
     document.getElementById('oldRecordsCount').textContent = oldInvoices.length;
     document.getElementById('systemPerformance').textContent = Math.max(performance, 0) + '%';
     
-    // Actualizar alertas del sistema
     updateSystemAlerts(percentage, oldInvoices.length, performance);
     
-    // Cargar configuración
     document.getElementById('maxInvoices').value = maintenanceConfig.maxInvoices;
     document.getElementById('autoCleanupEnabled').checked = maintenanceConfig.autoCleanupEnabled;
 }
