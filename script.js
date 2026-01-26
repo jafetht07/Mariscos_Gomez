@@ -1,8 +1,8 @@
 // Variables globales
 const users = {
-    'Gomez': 'qwrt2107',
-    'Tuko': '290597',
-    'Diana': 'qwrt2107'
+    'Gomez': { password: 'qwrt2107', securityQuestion: '¿Cuál es tu color favorito?', securityAnswer: 'vino' },
+    'Tuko': { password: '290597', securityQuestion: '¿En qué ciudad naciste?', securityAnswer: 'limon', isAdmin: true },
+    'Diana': { password: 'qwrt2107', securityQuestion: '¿Cuál es el nombre de tu mascota?', securityAnswer: 'milo' }
 };
 
 let currentUser = null;
@@ -15,8 +15,8 @@ let invoiceHistory = JSON.parse(localStorage.getItem('mariscos_invoices') || '[]
 // Variables para paginación
 let currentProductPage = 1;
 let currentSalesPage = 1;
-const itemsPerPage = 12; // productos por página
-const invoicesPerPage = 20; // facturas por página
+const itemsPerPage = 12;
+const invoicesPerPage = 20;
 
 // Configuración de mantenimiento
 let maintenanceConfig = JSON.parse(localStorage.getItem('mariscos_maintenance_config') || JSON.stringify({
@@ -33,13 +33,13 @@ function getStorageUsage() {
             total += localStorage[key].length + key.length;
         }
     }
-    return Math.round(total / 1024); // KB
+    return Math.round(total / 1024);
 }
 
 // Función para actualizar monitor de almacenamiento
 function updateStorageMonitor() {
     const used = getStorageUsage();
-    const limit = 5120; // 5MB en KB
+    const limit = 5120;
     const percentage = Math.round((used / limit) * 100);
     
     document.getElementById('storageUsed').textContent = used;
@@ -65,7 +65,7 @@ function updateStorageMonitor() {
 
 // Función para mostrar advertencia de almacenamiento
 function showStorageWarning() {
-    if (getStorageUsage() > 4096) { // > 4MB
+    if (getStorageUsage() > 4096) {
         showAlert('⚠️ Almacenamiento casi lleno. Se recomienda realizar limpieza automática.', 'warning');
     }
 }
@@ -98,14 +98,87 @@ function showAlert(message, type) {
     }
 }
 
-// Función de login
+// ============================================
+// NUEVAS FUNCIONES DE RECUPERACIÓN DE CONTRASEÑA
+// ============================================
+
+function showPasswordRecovery() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('recoveryForm').style.display = 'block';
+}
+
+function cancelRecovery() {
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('recoveryForm').style.display = 'none';
+    document.getElementById('recoveryUsername').value = '';
+    document.getElementById('securityAnswer').value = '';
+    const questionDiv = document.getElementById('securityQuestionDiv');
+    if (questionDiv) questionDiv.remove();
+}
+
+function checkRecoveryUser() {
+    const username = document.getElementById('recoveryUsername').value.trim();
+    
+    if (!username) {
+        showAlert('⚠️ Por favor ingresa tu nombre de usuario', 'danger');
+        return;
+    }
+    
+    if (!users[username]) {
+        showAlert('❌ Usuario no encontrado', 'danger');
+        return;
+    }
+    
+    const user = users[username];
+    const existingDiv = document.getElementById('securityQuestionDiv');
+    if (existingDiv) existingDiv.remove();
+    
+    const questionDiv = document.createElement('div');
+    questionDiv.id = 'securityQuestionDiv';
+    questionDiv.className = 'form-group';
+    questionDiv.innerHTML = `
+        <label>Pregunta de seguridad:</label>
+        <p style="font-style: italic; color: #555;">${user.securityQuestion}</p>
+        <input type="text" id="securityAnswer" placeholder="Tu respuesta" required>
+        <button type="button" class="btn" onclick="verifySecurityAnswer()">Verificar</button>
+    `;
+    
+    document.getElementById('recoveryForm').appendChild(questionDiv);
+}
+
+function verifySecurityAnswer() {
+    const username = document.getElementById('recoveryUsername').value.trim();
+    const answer = document.getElementById('securityAnswer').value.trim().toLowerCase();
+    
+    if (!answer) {
+        showAlert('⚠️ Por favor ingresa tu respuesta', 'danger');
+        return;
+    }
+    
+    const user = users[username];
+    
+    if (answer === user.securityAnswer.toLowerCase()) {
+        showAlert(`✅ Tu contraseña es: ${user.password}`, 'success');
+        setTimeout(() => {
+            cancelRecovery();
+        }, 5000);
+    } else {
+        showAlert('❌ Respuesta incorrecta', 'danger');
+    }
+}
+
+// ============================================
+// FIN NUEVAS FUNCIONES DE RECUPERACIÓN
+// ============================================
+
+// Función de login (MODIFICADA)
 function handleLogin(event) {
     event.preventDefault();
     
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
 
-    if (users[username] && users[username] === password) {
+    if (users[username] && users[username].password === password) {
         currentUser = username;
         isLoggedIn = true;
         localStorage.setItem('current_user', currentUser);
@@ -113,6 +186,16 @@ function handleLogin(event) {
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('mainSystem').classList.remove('hidden');
         document.getElementById('currentUser').textContent = username;
+        
+        // NUEVA FUNCIONALIDAD: Ocultar pestaña de mantenimiento si no es Tuko
+        const maintenanceTab = document.querySelector('[data-tab="maintenance"]');
+        if (maintenanceTab) {
+            if (users[username].isAdmin) {
+                maintenanceTab.style.display = 'block';
+            } else {
+                maintenanceTab.style.display = 'none';
+            }
+        }
         
         showAlert('✅ Inicio de sesión exitoso', 'success');
         initializeSystem();
@@ -227,7 +310,6 @@ function displayProducts() {
         grid.appendChild(productCard);
     });
 
-    // Actualizar paginación
     if (totalPages > 1) {
         document.getElementById('productsPagination').style.display = 'flex';
         document.getElementById('productPageInfo').textContent = `Página ${currentProductPage} de ${totalPages}`;
@@ -262,9 +344,9 @@ function changeProductPage(direction) {
     displayProducts();
 }
 
-// Función para buscar productos (mejorada)
+// Función para buscar productos
 function searchProducts() {
-    currentProductPage = 1; // Reiniciar a primera página
+    currentProductPage = 1;
     displayProducts();
 }
 
@@ -283,7 +365,6 @@ function handleAddProduct(event) {
         return;
     }
     
-    // Verificar límite de productos
     if (products.length >= 1000) {
         showAlert('⚠️ Límite de productos alcanzado. Considera usar la función de mantenimiento.', 'warning');
         return;
@@ -457,10 +538,8 @@ function generateInvoicePDF() {
         return;
     }
     
-    // Verificar límite de facturas
     if (invoiceHistory.length >= maintenanceConfig.maxInvoices) {
         if (confirm('Se ha alcanzado el límite de facturas. ¿Desea continuar? Se recomienda hacer limpieza de datos.')) {
-            // Continuar pero mostrar advertencia
             showAlert('⚠️ Sistema cerca del límite. Visite la sección de Mantenimiento.', 'warning');
         } else {
             return;
@@ -474,7 +553,6 @@ function generateInvoicePDF() {
     const invoiceNumber = `FAC-${new Date().getFullYear()}-${String(invoiceHistory.length + 1).padStart(4, '0')}`;
     const now = new Date();
     
-    // Actualizar stock
     invoiceItems.forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (product) {
@@ -483,7 +561,6 @@ function generateInvoicePDF() {
     });
     saveProducts();
     
-    // Guardar factura
     const invoice = {
         number: invoiceNumber,
         date: now.toLocaleDateString('es-CR'),
@@ -497,7 +574,6 @@ function generateInvoicePDF() {
     invoiceHistory.push(invoice);
     saveInvoices();
     
-    // Generar PDF
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
@@ -533,7 +609,7 @@ function generateInvoicePDF() {
     });
     
     doc.setFontSize(14);
-    doc.text(`TOTAL:CRC ${total.toLocaleString('es-CR')}`, 150, y + 10);
+    doc.text(`TOTAL: CRC ${total.toLocaleString('es-CR')}`, 150, y + 10);
     
     doc.setFontSize(10);
     doc.text('¡Gracias por su compra!', 20, y + 30);
@@ -545,7 +621,6 @@ function generateInvoicePDF() {
     clearInvoice();
     updateInvoiceProductSelect();
     
-    // Verificar si es necesario hacer limpieza automática
     if (maintenanceConfig.autoCleanupEnabled && getStorageUsage() > 4096) {
         setTimeout(() => {
             if (confirm('El sistema ha detectado que el almacenamiento está casi lleno. ¿Desea realizar una limpieza automática?')) {
@@ -583,7 +658,7 @@ function displaySalesReports() {
 
 // Función para filtrar ventas
 function filterSales() {
-    currentSalesPage = 1; // Reiniciar paginación
+    currentSalesPage = 1;
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
     
@@ -670,11 +745,9 @@ function updateSalesTable(invoices) {
         tbody.appendChild(row);
     });
 
-    // Actualizar paginación
     if (totalPages > 1) {
         document.getElementById('salesPagination').style.display = 'flex';
         document.getElementById('salesPageInfo').textContent = `Página ${currentSalesPage} de ${totalPages}`;
-        
         const prevBtn = document.querySelector('#salesPagination button:first-child');
         const nextBtn = document.querySelector('#salesPagination button:last-child');
         
@@ -1183,7 +1256,7 @@ function initializeSystem() {
     }
 }
 
-// Función para verificar sesión automática
+// Función para verificar sesión automática (MODIFICADA)
 function checkAutoLogin() {
     const savedUser = localStorage.getItem('current_user');
     
@@ -1201,6 +1274,17 @@ function checkAutoLogin() {
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('mainSystem').classList.remove('hidden');
         document.getElementById('currentUser').textContent = savedUser;
+        
+        // NUEVA FUNCIONALIDAD: Ocultar pestaña de mantenimiento si no es admin
+        const maintenanceTab = document.querySelector('[data-tab="maintenance"]');
+        if (maintenanceTab) {
+            if (users[savedUser].isAdmin) {
+                maintenanceTab.style.display = 'block';
+            } else {
+                maintenanceTab.style.display = 'none';
+            }
+        }
+        
         initializeSystem();
     }
 }
