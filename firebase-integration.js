@@ -28,7 +28,6 @@
         } catch(e){
             console.warn('No se pudo cargar Firebase scripts:', e);
             window.__mariscos_isFirebaseEnabled = false;
-            if (typeof showAlert === 'function') showAlert('⚠️ No se pudieron cargar scripts de Firebase. Usando LocalStorage', 'warning');
             return;
         }
 
@@ -37,12 +36,10 @@
             window.__mariscos_db = firebase.firestore();
             window.__mariscos_isFirebaseEnabled = true;
             console.log('✅ Firebase inicializado');
-            if (typeof showAlert === 'function') showAlert('☁️ Firebase inicializado', 'info');
             await firebaseLoadAll();
         } catch(err){
             console.error('Error inicializando Firebase', err);
             window.__mariscos_isFirebaseEnabled = false;
-            if (typeof showAlert === 'function') showAlert('⚠️ Firebase no disponible. Usando LocalStorage', 'warning');
         }
     }
 
@@ -85,43 +82,91 @@
         }
     }
 
-    // Load and merge remote data into localStorage
+    // Save credits to Firestore
+    async function firebaseSaveCredits(){
+        try {
+            if (!window.__mariscos_db) throw new Error('No firestore');
+            const db = window.__mariscos_db;
+            const batch = db.batch();
+            (creditSales || []).forEach(c=>{
+                const docRef = db.collection('credits').doc(String(c.id));
+                batch.set(docRef, c);
+            });
+            await batch.commit();
+            console.log('✅ Créditos sincronizados a Firebase');
+            return true;
+        } catch(e){
+            console.error('Error firebaseSaveCredits', e);
+            return false;
+        }
+    }
+
+    // Load and merge remote data into localStorage — SIN DUPLICADOS
     async function firebaseLoadAll(){
         try {
             if (!window.__mariscos_db) return;
             const db = window.__mariscos_db;
-            // products
+
+            // ── Productos ──────────────────────────────────────
             const prodSnap = await db.collection('products').get();
             if (!prodSnap.empty){
                 const remote = [];
-                prodSnap.forEach(d=>remote.push(d.data()));
-                const local = JSON.parse(localStorage.getItem('mariscos_products')||'[]');
+                prodSnap.forEach(d => remote.push(d.data()));
+                const local = JSON.parse(localStorage.getItem('mariscos_products') || '[]');
                 const map = new Map();
-                local.forEach(p=>map.set(p.id,p));
-                remote.forEach(p=>map.set(p.id,p)); // prefer remote
+                local.forEach(p => map.set(p.id, p));
+                remote.forEach(p => map.set(p.id, p)); // Firebase tiene prioridad
                 products = Array.from(map.values());
-                if (products.length>0) nextProductId = Math.max(...products.map(p=>p.id))+1;
+                if (products.length > 0) nextProductId = Math.max(...products.map(p => p.id)) + 1;
                 localStorage.setItem('mariscos_products', JSON.stringify(products));
                 console.log('✅ Productos cargados/mergeados desde Firebase');
             }
-            // invoices
+
+            // ── Facturas ───────────────────────────────────────
             const invSnap = await db.collection('invoices').orderBy('fullDateTime','desc').limit(1000).get();
             if (!invSnap.empty){
                 const remoteInv = [];
-                invSnap.forEach(d=>remoteInv.push(d.data()));
-                const localInv = JSON.parse(localStorage.getItem('mariscos_invoices')||'[]');
+                invSnap.forEach(d => remoteInv.push(d.data()));
+                const localInv = JSON.parse(localStorage.getItem('mariscos_invoices') || '[]');
                 const imap = new Map();
-                localInv.forEach(i=>imap.set(i.number,i));
-                remoteInv.forEach(i=>imap.set(i.number,i));
+                localInv.forEach(i => imap.set(i.number, i));
+                remoteInv.forEach(i => imap.set(i.number, i)); // Firebase tiene prioridad
                 invoiceHistory = Array.from(imap.values());
                 localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
                 console.log('✅ Facturas cargadas/mergeadas desde Firebase');
             }
-            // update UI
-            if (typeof displayProducts==='function') displayProducts();
-            if (typeof updateReports==='function') updateReports();
-            if (typeof updateInvoiceProductSelect==='function') updateInvoiceProductSelect();
-            if (typeof filterSales==='function') filterSales();
+
+            // ── Créditos — deduplicar por invoiceNumber ────────
+            const credSnap = await db.collection('credits').get();
+            if (!credSnap.empty){
+                const remoteCredits = [];
+                credSnap.forEach(d => remoteCredits.push(d.data()));
+                const localCredits = JSON.parse(localStorage.getItem('mariscos_credits') || '[]');
+                const cmap = new Map();
+                localCredits.forEach(c => cmap.set(c.invoiceNumber, c));
+                remoteCredits.forEach(c => cmap.set(c.invoiceNumber, c)); // Firebase tiene prioridad
+                creditSales = Array.from(cmap.values());
+                if (creditSales.length > 0) nextCreditId = Math.max(...creditSales.map(c => c.id)) + 1;
+                localStorage.setItem('mariscos_credits', JSON.stringify(creditSales));
+                localStorage.setItem('mariscos_next_credit_id', nextCreditId.toString());
+                console.log('✅ Créditos cargados/mergeados desde Firebase');
+            } else {
+                // Si no hay en Firebase, limpiar duplicados del localStorage
+                const localCredits = JSON.parse(localStorage.getItem('mariscos_credits') || '[]');
+                const cmap = new Map();
+                localCredits.forEach(c => cmap.set(c.invoiceNumber, c));
+                creditSales = Array.from(cmap.values());
+                localStorage.setItem('mariscos_credits', JSON.stringify(creditSales));
+            }
+
+            // Actualizar UI
+            if (typeof displayProducts === 'function') displayProducts();
+            if (typeof updateReports === 'function') updateReports();
+            if (typeof updateInvoiceProductSelect === 'function') updateInvoiceProductSelect();
+            if (typeof filterSales === 'function') filterSales();
+            if (typeof displayCredits === 'function') displayCredits();
+            if (typeof updateStorageMonitor === 'function') updateStorageMonitor();
+
         } catch(e){
             console.error('Error firebaseLoadAll', e);
         }
@@ -130,17 +175,16 @@
     // Expose functions
     window.firebaseSaveProducts = firebaseSaveProducts;
     window.firebaseSaveInvoices = firebaseSaveInvoices;
-    window.firebaseLoadAll = firebaseLoadAll;
+    window.firebaseSaveCredits  = firebaseSaveCredits;
+    window.firebaseLoadAll      = firebaseLoadAll;
 
-    // Override local save functions to also sync automatically (non-blocking)
+    // Override local save functions to also sync automatically
     if (typeof window.saveProducts === 'function'){
         const origSaveProducts = window.saveProducts;
         window.saveProducts = function(){
             try { origSaveProducts(); } catch(e){ console.error('origSaveProducts error', e); }
             if (window.__mariscos_isFirebaseEnabled && navigator.onLine){
-                firebaseSaveProducts().then(ok=>{
-                    if (ok && typeof showAlert==='function') showAlert('☁️ Productos sincronizados automáticamente','success');
-                });
+                firebaseSaveProducts();
             }
         };
     }
@@ -149,9 +193,16 @@
         window.saveInvoices = function(){
             try { origSaveInvoices(); } catch(e){ console.error('origSaveInvoices error', e); }
             if (window.__mariscos_isFirebaseEnabled && navigator.onLine){
-                firebaseSaveInvoices().then(ok=>{
-                    if (ok && typeof showAlert==='function') showAlert('☁️ Facturas sincronizadas automáticamente','success');
-                });
+                firebaseSaveInvoices();
+            }
+        };
+    }
+    if (typeof window.saveCredits === 'function'){
+        const origSaveCredits = window.saveCredits;
+        window.saveCredits = function(){
+            try { origSaveCredits(); } catch(e){ console.error('origSaveCredits error', e); }
+            if (window.__mariscos_isFirebaseEnabled && navigator.onLine){
+                firebaseSaveCredits();
             }
         };
     }
@@ -164,9 +215,14 @@
             if (typeof showAlert==='function') showAlert('🔄 Iniciando sincronización...','info');
             await firebaseSaveProducts();
             await firebaseSaveInvoices();
+            await firebaseSaveCredits();
             if (typeof showAlert==='function') showAlert('✅ Sincronización con Firebase completada','success');
-        } catch(e){ console.error('syncWithFirebase error', e); if (typeof showAlert==='function') showAlert('❌ Error sincronizando con Firebase','danger'); }
+        } catch(e){
+            console.error('syncWithFirebase error', e);
+            if (typeof showAlert==='function') showAlert('❌ Error sincronizando con Firebase','danger');
+        }
     };
+
     window.migrateToFirebase = async function(){
         try {
             if (!window.__mariscos_isFirebaseEnabled){ if (typeof showAlert==='function') showAlert('⚠️ Firebase no configurado','warning'); return; }
@@ -174,9 +230,13 @@
             if (!confirm('¿Confirmas migrar los datos locales a Firebase?')) return;
             const ok1 = await firebaseSaveProducts();
             const ok2 = await firebaseSaveInvoices();
-            if (ok1 && ok2){ if (typeof showAlert==='function') showAlert('📤 Migración completa','success'); }
+            const ok3 = await firebaseSaveCredits();
+            if (ok1 && ok2 && ok3){ if (typeof showAlert==='function') showAlert('📤 Migración completa','success'); }
             else { if (typeof showAlert==='function') showAlert('⚠️ Migración parcial, revisa la consola','warning'); }
-        } catch(e){ console.error('migrateToFirebase error', e); if (typeof showAlert==='function') showAlert('❌ Error durante migración','danger'); }
+        } catch(e){
+            console.error('migrateToFirebase error', e);
+            if (typeof showAlert==='function') showAlert('❌ Error durante migración','danger');
+        }
     };
 
     // Delete/update helpers
@@ -184,7 +244,6 @@
         try{
             if (!window.__mariscos_isFirebaseEnabled || !window.__mariscos_db) return false;
             await window.__mariscos_db.collection('products').doc(String(id)).delete();
-            console.log('✅ Producto eliminado en Firebase', id);
             return true;
         } catch(e){ console.error('firebaseDeleteProduct', e); return false; }
     }
@@ -192,15 +251,20 @@
         try{
             if (!window.__mariscos_isFirebaseEnabled || !window.__mariscos_db) return false;
             await window.__mariscos_db.collection('invoices').doc(String(number)).delete();
-            console.log('✅ Factura eliminada en Firebase', number);
             return true;
         } catch(e){ console.error('firebaseDeleteInvoice', e); return false; }
+    }
+    async function firebaseDeleteCredit(id){
+        try{
+            if (!window.__mariscos_isFirebaseEnabled || !window.__mariscos_db) return false;
+            await window.__mariscos_db.collection('credits').doc(String(id)).delete();
+            return true;
+        } catch(e){ console.error('firebaseDeleteCredit', e); return false; }
     }
     async function firebaseUpdateProduct(prod){
         try{
             if (!window.__mariscos_isFirebaseEnabled || !window.__mariscos_db) return false;
             await window.__mariscos_db.collection('products').doc(String(prod.id)).set(prod);
-            console.log('✅ Producto actualizado en Firebase', prod.id);
             return true;
         } catch(e){ console.error('firebaseUpdateProduct', e); return false; }
     }
@@ -208,12 +272,17 @@
         try{
             if (!window.__mariscos_isFirebaseEnabled || !window.__mariscos_db) return false;
             await window.__mariscos_db.collection('invoices').doc(String(inv.number)).set(inv);
-            console.log('✅ Factura actualizada en Firebase', inv.number);
             return true;
         } catch(e){ console.error('firebaseUpdateInvoice', e); return false; }
     }
+    async function firebaseUpdateCredit(credit){
+        try{
+            if (!window.__mariscos_isFirebaseEnabled || !window.__mariscos_db) return false;
+            await window.__mariscos_db.collection('credits').doc(String(credit.id)).set(credit);
+            return true;
+        } catch(e){ console.error('firebaseUpdateCredit', e); return false; }
+    }
 
-    // Patch functions after page loads to ensure originals exist
     function patch(name, wrapper){
         try {
             if (typeof window[name] === 'function'){
@@ -228,58 +297,58 @@
 
     patch('deleteProduct', function(orig, id){
         const res = orig.apply(this, [id]);
-        try {
-            if (window.__mariscos_isFirebaseEnabled && navigator.onLine) {
-                firebaseDeleteProduct(id).then(ok=>{ if (ok && typeof showAlert==='function') showAlert('☁️ Producto eliminado en Firebase','success'); });
-            } else { console.log('Delete product local only; will sync when online.'); }
-        } catch(e){ console.error(e); }
+        if (window.__mariscos_isFirebaseEnabled && navigator.onLine) firebaseDeleteProduct(id);
         return res;
     });
 
     patch('editProduct', function(orig, id){
         const res = orig.apply(this, [id]);
-        try {
-            setTimeout(()=>{
-                const prod = (products||[]).find(p=>p.id===id);
-                if (prod && window.__mariscos_isFirebaseEnabled && navigator.onLine) {
-                    firebaseUpdateProduct(prod).then(ok=>{ if (ok && typeof showAlert==='function') showAlert('☁️ Producto actualizado en Firebase','success'); });
-                } else { console.log('Edit product local only; will sync when online.'); }
-            }, 300);
-        } catch(e){ console.error(e); }
+        setTimeout(()=>{
+            const prod = (products||[]).find(p=>p.id===id);
+            if (prod && window.__mariscos_isFirebaseEnabled && navigator.onLine) firebaseUpdateProduct(prod);
+        }, 300);
         return res;
     });
 
     patch('deleteInvoice', function(orig, invoiceNumber){
         const res = orig.apply(this, [invoiceNumber]);
-        try {
-            if (window.__mariscos_isFirebaseEnabled && navigator.onLine) {
-                firebaseDeleteInvoice(invoiceNumber).then(ok=>{ if (ok && typeof showAlert==='function') showAlert('☁️ Factura eliminada en Firebase','success'); });
-            } else { console.log('Delete invoice local only; will sync when online.'); }
-        } catch(e){ console.error(e); }
+        if (window.__mariscos_isFirebaseEnabled && navigator.onLine) firebaseDeleteInvoice(invoiceNumber);
+        return res;
+    });
+
+    patch('deleteCredit', function(orig, creditId){
+        const res = orig.apply(this, [creditId]);
+        if (window.__mariscos_isFirebaseEnabled && navigator.onLine) firebaseDeleteCredit(creditId);
         return res;
     });
 
     patch('generateInvoicePDF', function(orig){
         const res = orig.apply(this, Array.from(arguments).slice(1));
-        try {
-            setTimeout(()=>{
-                const lastInv = (invoiceHistory||[])[invoiceHistory.length-1];
-                if (lastInv && window.__mariscos_isFirebaseEnabled && navigator.onLine) {
-                    firebaseUpdateInvoice(lastInv).then(ok=>{ if (ok && typeof showAlert==='function') showAlert('☁️ Factura sincronizada en Firebase','success'); });
-                } else { console.log('Invoice created local only; will sync when online.'); }
-            }, 400);
-        } catch(e){ console.error(e); }
+        setTimeout(()=>{
+            const lastInv = (invoiceHistory||[])[invoiceHistory.length-1];
+            if (lastInv && window.__mariscos_isFirebaseEnabled && navigator.onLine) firebaseUpdateInvoice(lastInv);
+            const lastCredit = (creditSales||[])[creditSales.length-1];
+            if (lastCredit && window.__mariscos_isFirebaseEnabled && navigator.onLine) firebaseUpdateCredit(lastCredit);
+        }, 400);
         return res;
     });
 
-    // Auto-sync when back online
+    patch('registerPayment', function(orig, creditId){
+        const res = orig.apply(this, [creditId]);
+        setTimeout(()=>{
+            const credit = (creditSales||[]).find(c=>c.id===creditId);
+            if (credit && window.__mariscos_isFirebaseEnabled && navigator.onLine) firebaseUpdateCredit(credit);
+        }, 300);
+        return res;
+    });
+
+    // Auto-sync cuando vuelve la conexión
     window.addEventListener('online', ()=>{
         if (window.__mariscos_isFirebaseEnabled){
             setTimeout(()=>{ if (typeof syncWithFirebase==='function') syncWithFirebase(); }, 1000);
         }
     });
 
-    // Initialize after small delay to allow page functions to exist
     setTimeout(initFirebase, 700);
 
-})(); // end IIFE
+})();
