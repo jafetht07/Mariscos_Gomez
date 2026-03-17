@@ -5,32 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mariscos Gómez — Sistema de Inventario</title>
 
-    <!-- Hoja de estilos principal -->
     <link rel="stylesheet" href="styles.css">
-
-    <!--
-        Librerías externas:
-        - jsPDF: Generación de documentos PDF desde el navegador
-        - jsPDF AutoTable: Plugin para tablas dentro de PDFs
-        - SheetJS (XLSX): Exportación de datos a formato Excel
-    -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
-    <!-- ============================================================
-         PANTALLA DE LOGIN
-         Se muestra al cargar la app. Se oculta tras autenticar.
-    ============================================================ -->
+    <!-- LOGIN -->
     <div id="loginScreen">
         <div class="login-container">
-
-            <div class="login-logo">🦐</div>
+            <div class="login-logo"><i data-lucide="fish"></i></div>
             <h2>Mariscos Gómez</h2>
             <p class="login-subtitle">Sistema de Inventario y Facturación</p>
-
             <form id="loginForm">
                 <div class="form-group">
                     <label for="username">Usuario</label>
@@ -42,7 +30,6 @@
                 </div>
                 <button type="submit">Iniciar Sesión</button>
             </form>
-
             <div class="login-info">
                 <strong>Usuarios disponibles:</strong> Gomez, Tuko, Diana
             </div>
@@ -50,92 +37,81 @@
     </div>
 
 
-    <!-- ============================================================
-         SISTEMA PRINCIPAL
-         Se activa tras el login exitoso. Contiene sidebar + contenido.
-    ============================================================ -->
+    <!-- SISTEMA PRINCIPAL -->
     <div id="mainSystem" class="hidden">
 
-        <!-- --------------------------------------------------------
-             BARRA LATERAL (SIDEBAR)
-             Navegación principal, info del usuario y uso de almacenamiento.
-        -------------------------------------------------------- -->
+        <!-- SIDEBAR -->
         <aside class="sidebar" id="sidebar">
 
-            <!-- Cabecera: logo y nombre del sistema -->
             <div class="sidebar-header">
-                <div class="sidebar-logo">🦐</div>
+                <div class="sidebar-logo"><i data-lucide="fish"></i></div>
                 <div class="sidebar-brand">
                     <span class="brand-name">Mariscos</span>
                     <span class="brand-sub">Gómez</span>
                 </div>
-                <!-- Botón visible solo en móvil -->
-                <button class="sidebar-close" id="sidebarClose" aria-label="Cerrar menú">✕</button>
+                <button class="sidebar-close" id="sidebarClose" aria-label="Cerrar menú">
+                    <i data-lucide="x"></i>
+                </button>
             </div>
 
-            <!-- Bloque de usuario activo -->
             <div class="sidebar-user">
-                <div class="user-avatar" aria-hidden="true">👤</div>
+                <div class="user-avatar"><i data-lucide="user"></i></div>
                 <div class="user-details">
                     <span class="user-name" id="currentUser">Usuario</span>
                     <span class="user-role">Administrador</span>
                 </div>
-                <button class="logout-btn" id="logoutBtn" title="Cerrar sesión">🚪</button>
+                <button class="logout-btn" id="logoutBtn" title="Cerrar sesión">
+                    <i data-lucide="log-out"></i>
+                </button>
             </div>
 
-            <!-- Menú de navegación -->
             <nav class="sidebar-nav" role="navigation" aria-label="Menú principal">
 
                 <div class="nav-section-label">Principal</div>
                 <a class="nav-item active" data-tab="dashboard" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">🏠</span>
+                    <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
                     <span class="nav-label">Inicio</span>
                 </a>
                 <a class="nav-item" data-tab="inventory" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">📦</span>
+                    <span class="nav-icon"><i data-lucide="package"></i></span>
                     <span class="nav-label">Inventario</span>
                 </a>
                 <a class="nav-item" data-tab="invoice" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">🧾</span>
+                    <span class="nav-icon"><i data-lucide="receipt"></i></span>
                     <span class="nav-label">Facturación</span>
                 </a>
 
                 <div class="nav-section-label">Gestión</div>
                 <a class="nav-item" data-tab="add-product" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">➕</span>
+                    <span class="nav-icon"><i data-lucide="plus-circle"></i></span>
                     <span class="nav-label">Agregar Producto</span>
                 </a>
                 <a class="nav-item" data-tab="credits" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">💳</span>
+                    <span class="nav-icon"><i data-lucide="credit-card"></i></span>
                     <span class="nav-label">Créditos</span>
                 </a>
 
                 <div class="nav-section-label">Reportes</div>
                 <a class="nav-item" data-tab="reports" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">📊</span>
+                    <span class="nav-icon"><i data-lucide="bar-chart-2"></i></span>
                     <span class="nav-label">Reportes</span>
                 </a>
                 <a class="nav-item" data-tab="sales-reports" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">📈</span>
+                    <span class="nav-icon"><i data-lucide="trending-up"></i></span>
                     <span class="nav-label">Ventas</span>
                 </a>
                 <a class="nav-item" data-tab="credits-reports" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">📋</span>
+                    <span class="nav-icon"><i data-lucide="clipboard-list"></i></span>
                     <span class="nav-label">Rep. Créditos</span>
                 </a>
 
-                <!--
-                    Sección de Mantenimiento: visible solo para el administrador.
-                    Se activa desde auth.js según el usuario que inicia sesión.
-                -->
                 <div class="nav-section-label" id="maintenanceNavLabel" style="display:none;">Sistema</div>
                 <a class="nav-item" data-tab="maintenance" id="maintenanceNavItem" style="display:none;" role="button" tabindex="0">
-                    <span class="nav-icon" aria-hidden="true">🔧</span>
+                    <span class="nav-icon"><i data-lucide="settings"></i></span>
                     <span class="nav-label">Mantenimiento</span>
                 </a>
             </nav>
 
-            <!-- Indicador de uso del localStorage (límite ~5 MB en la mayoría de navegadores) -->
             <div class="sidebar-storage" role="status" aria-label="Uso de almacenamiento">
                 <div class="storage-label">Almacenamiento Local</div>
                 <div class="storage-bar-mini">
@@ -149,18 +125,15 @@
             </div>
         </aside>
 
-        <!-- Capa oscura que cubre el contenido al abrir el sidebar en móvil -->
         <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
 
-
-        <!-- --------------------------------------------------------
-             CONTENIDO PRINCIPAL
-        -------------------------------------------------------- -->
+        <!-- CONTENIDO PRINCIPAL -->
         <div class="main-wrapper" id="mainWrapper">
 
-            <!-- Barra superior: toggle de menú, título dinámico y estadísticas -->
             <header class="topbar" role="banner">
-                <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú lateral">☰</button>
+                <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú lateral">
+                    <i data-lucide="menu"></i>
+                </button>
                 <div class="topbar-title" id="topbarTitle">Panel de Control</div>
                 <div class="topbar-right">
                     <span class="topbar-stats">
@@ -168,58 +141,53 @@
                         <span id="totalProducts">0</span> productos &bull;
                         <span id="totalInvoices">0</span> facturas
                     </span>
+                    <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
+                        <span class="theme-toggle-icon"><i data-lucide="moon"></i></span>
+                        <span class="theme-toggle-label" id="themeLabel">Modo Claro</span>
+                    </button>
                 </div>
             </header>
 
             <main class="main-content" role="main">
 
-                <!-- ================================================
-                     DASHBOARD — Panel de Control
-                     Vista de inicio. Muestra KPIs y accesos directos.
-                ================================================ -->
+                <!-- DASHBOARD -->
                 <div id="dashboard" class="page active">
                     <div class="page-header">
                         <h1 class="page-title">Panel de Control</h1>
                         <p class="page-subtitle">Bienvenido al sistema de gestión de Mariscos Gómez</p>
                     </div>
 
-                    <!--
-                        Indicadores KPI.
-                        Los valores se actualizan dinámicamente desde app.js
-                        cada vez que se carga esta sección.
-                    -->
                     <div class="quick-stats" role="region" aria-label="Indicadores principales">
                         <div class="qs-card">
-                            <div class="qs-icon" aria-hidden="true">📦</div>
+                            <div class="qs-icon"><i data-lucide="package"></i></div>
                             <div class="qs-data">
                                 <div class="qs-number" id="dashTotalProducts">0</div>
                                 <div class="qs-label">Productos</div>
                             </div>
                         </div>
                         <div class="qs-card">
-                            <div class="qs-icon" aria-hidden="true">⚠️</div>
+                            <div class="qs-icon"><i data-lucide="alert-triangle"></i></div>
                             <div class="qs-data">
                                 <div class="qs-number" id="dashLowStock">0</div>
                                 <div class="qs-label">Stock Bajo</div>
                             </div>
                         </div>
                         <div class="qs-card">
-                            <div class="qs-icon" aria-hidden="true">🧾</div>
+                            <div class="qs-icon"><i data-lucide="file-text"></i></div>
                             <div class="qs-data">
                                 <div class="qs-number" id="dashInvoices">0</div>
                                 <div class="qs-label">Facturas</div>
                             </div>
                         </div>
                         <div class="qs-card">
-                            <div class="qs-icon" aria-hidden="true">💰</div>
+                            <div class="qs-icon"><i data-lucide="dollar-sign"></i></div>
                             <div class="qs-data">
-                                <!-- ₡ = Colón costarricense -->
-                                <div class="qs-number">₡<span id="dashTotalSales">0</span></div>
+                                <div class="qs-number">&#x20A1;<span id="dashTotalSales">0</span></div>
                                 <div class="qs-label">Total Vendido</div>
                             </div>
                         </div>
                         <div class="qs-card">
-                            <div class="qs-icon" aria-hidden="true">💳</div>
+                            <div class="qs-icon"><i data-lucide="credit-card"></i></div>
                             <div class="qs-data">
                                 <div class="qs-number" id="dashActiveCredits">0</div>
                                 <div class="qs-label">Créditos Activos</div>
@@ -227,84 +195,69 @@
                         </div>
                     </div>
 
-                    <!--
-                        Tarjetas de acceso rápido.
-                        Cada tarjeta usa data-goto para navegar a su sección.
-                        El evento click está registrado en el bloque <script> al final.
-                    -->
                     <div class="dashboard-grid" role="region" aria-label="Accesos directos">
                         <div class="dash-card primary" data-goto="invoice" role="button" tabindex="0">
-                            <div class="dash-card-icon" aria-hidden="true">🧾</div>
+                            <div class="dash-card-icon"><i data-lucide="receipt"></i></div>
                             <div class="dash-card-content">
                                 <div class="dash-card-title">Nueva Factura</div>
                                 <div class="dash-card-desc">Crear una factura rápidamente</div>
                             </div>
-                            <div class="dash-card-arrow" aria-hidden="true">→</div>
+                            <div class="dash-card-arrow"><i data-lucide="arrow-right"></i></div>
                             <div class="dash-card-shortcut">F2 Atajo</div>
                         </div>
-
                         <div class="dash-card" data-goto="inventory" role="button" tabindex="0">
-                            <div class="dash-card-icon" aria-hidden="true">📦</div>
+                            <div class="dash-card-icon"><i data-lucide="package"></i></div>
                             <div class="dash-card-content">
                                 <div class="dash-card-title">Inventario</div>
                                 <div class="dash-card-desc">Ver y gestionar productos</div>
                             </div>
-                            <div class="dash-card-arrow" aria-hidden="true">→</div>
+                            <div class="dash-card-arrow"><i data-lucide="arrow-right"></i></div>
                         </div>
-
                         <div class="dash-card" data-goto="add-product" role="button" tabindex="0">
-                            <div class="dash-card-icon" aria-hidden="true">➕</div>
+                            <div class="dash-card-icon"><i data-lucide="plus-circle"></i></div>
                             <div class="dash-card-content">
                                 <div class="dash-card-title">Productos</div>
                                 <div class="dash-card-desc">Gestión de catálogo y precios</div>
                             </div>
-                            <div class="dash-card-arrow" aria-hidden="true">→</div>
+                            <div class="dash-card-arrow"><i data-lucide="arrow-right"></i></div>
                         </div>
-
                         <div class="dash-card" data-goto="credits" role="button" tabindex="0">
-                            <div class="dash-card-icon" aria-hidden="true">💳</div>
+                            <div class="dash-card-icon"><i data-lucide="credit-card"></i></div>
                             <div class="dash-card-content">
                                 <div class="dash-card-title">Cuentas por Cobrar</div>
                                 <div class="dash-card-desc">Gestiona créditos y saldos pendientes</div>
                             </div>
-                            <div class="dash-card-arrow" aria-hidden="true">→</div>
+                            <div class="dash-card-arrow"><i data-lucide="arrow-right"></i></div>
                         </div>
-
                         <div class="dash-card" data-goto="sales-reports" role="button" tabindex="0">
-                            <div class="dash-card-icon" aria-hidden="true">📈</div>
+                            <div class="dash-card-icon"><i data-lucide="trending-up"></i></div>
                             <div class="dash-card-content">
                                 <div class="dash-card-title">Dashboard de Ventas</div>
                                 <div class="dash-card-desc">Analiza ingresos y estadísticas</div>
                             </div>
-                            <div class="dash-card-arrow" aria-hidden="true">→</div>
+                            <div class="dash-card-arrow"><i data-lucide="arrow-right"></i></div>
                         </div>
-
                         <div class="dash-card" data-goto="reports" role="button" tabindex="0">
-                            <div class="dash-card-icon" aria-hidden="true">📊</div>
+                            <div class="dash-card-icon"><i data-lucide="bar-chart-2"></i></div>
                             <div class="dash-card-content">
                                 <div class="dash-card-title">Reportes</div>
                                 <div class="dash-card-desc">Estadísticas generales del negocio</div>
                             </div>
-                            <div class="dash-card-arrow" aria-hidden="true">→</div>
+                            <div class="dash-card-arrow"><i data-lucide="arrow-right"></i></div>
                         </div>
-
                         <div class="dash-card" data-goto="credits-reports" role="button" tabindex="0">
-                            <div class="dash-card-icon" aria-hidden="true">📋</div>
+                            <div class="dash-card-icon"><i data-lucide="clipboard-list"></i></div>
                             <div class="dash-card-content">
                                 <div class="dash-card-title">Historial</div>
                                 <div class="dash-card-desc">Ventas emitidas y registro de créditos</div>
                             </div>
-                            <div class="dash-card-arrow" aria-hidden="true">→</div>
+                            <div class="dash-card-arrow"><i data-lucide="arrow-right"></i></div>
                         </div>
                     </div>
                 </div>
 
 
-                <!-- ================================================
-                     INVENTARIO
-                     Lista paginada con buscador en tiempo real.
-                     El grid lo construye products.js → displayProducts()
-                ================================================ -->
+                <!-- INVENTARIO -->
                 <div id="inventory" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Inventario de Productos</h1>
@@ -313,18 +266,15 @@
                         placeholder="Buscar por nombre o categoría..."
                         aria-label="Buscar productos">
                     <div class="pagination" id="productsPagination" style="display:none;">
-                        <button onclick="changeProductPage(-1)">&laquo; Anterior</button>
+                        <button onclick="changeProductPage(-1)">Anterior</button>
                         <span id="productPageInfo">Página 1 de 1</span>
-                        <button onclick="changeProductPage(1)">Siguiente &raquo;</button>
+                        <button onclick="changeProductPage(1)">Siguiente</button>
                     </div>
                     <div id="productGrid" class="product-grid" role="list"></div>
                 </div>
 
 
-                <!-- ================================================
-                     AGREGAR PRODUCTO
-                     Formulario procesado por products.js → addProduct()
-                ================================================ -->
+                <!-- AGREGAR PRODUCTO -->
                 <div id="add-product" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Agregar Nuevo Producto</h1>
@@ -347,13 +297,13 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="productPrice">Precio por Unidad / Kg (₡)</label>
+                                <label for="productPrice">Precio de Venta (&#x20A1;)</label>
                                 <input type="number" id="productPrice" step="0.01" min="0" required placeholder="0.00">
                             </div>
                             <div class="form-group">
-                                <label for="productCostPrice">Precio de Costo (₡) <span style="font-weight:400;color:#4a6080;text-transform:none;">(opcional)</span></label>
+                                <label for="productCostPrice">Precio de Costo (&#x20A1;) <span style="font-weight:400;color:var(--text-muted);text-transform:none;">(opcional)</span></label>
                                 <input type="number" id="productCostPrice" step="0.01" min="0" placeholder="0.00">
-                                </div>
+                            </div>
                             <div class="form-group">
                                 <label for="productStock">Stock Inicial</label>
                                 <input type="number" id="productStock" min="0" required placeholder="0">
@@ -375,17 +325,11 @@
                 </div>
 
 
-                <!-- ================================================
-                     FACTURACIÓN
-                     Genera facturas en PDF con jsPDF.
-                     Lógica en invoice.js
-                ================================================ -->
+                <!-- FACTURACIÓN -->
                 <div id="invoice" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Sistema de Facturación</h1>
                     </div>
-
-                    <!-- Layout dos columnas: cliente | productos -->
                     <div class="invoice-layout">
                         <div class="form-card">
                             <h3>Datos del Cliente</h3>
@@ -401,34 +345,29 @@
                                 <label for="clientAddress">Dirección</label>
                                 <input type="text" id="clientAddress" placeholder="Dirección completa">
                             </div>
-                            <!--  solo visible para Tuko-->
-                            <div id="useCostPriceRow" style="display:none; margin-bottom:14px;
-                                    background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3);
-                                    border-radius:8px; padding:12px 14px;">
-                                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0;">
-                                <input type="checkbox" id="useCostPrice" style="width:16px;height:16px;cursor:pointer;">
-                                <span style="font-size:0.88rem; color:#fbbf24; font-weight:600;">
-                                 Usar precio de costo (uso interno / retiro de productos)
-                                </span>
+
+                            <!-- Solo visible para Tuko -->
+                            <div id="useCostPriceRow" style="display:none;margin-bottom:14px;
+                                 background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);
+                                 border-radius:8px;padding:12px 14px;">
+                                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                                    <input type="checkbox" id="useCostPrice" style="width:16px;height:16px;cursor:pointer;">
+                                    <span style="font-size:0.88rem;color:#fbbf24;font-weight:600;">
+                                        Usar precio de costo (uso interno / retiro de productos)
+                                    </span>
                                 </label>
-                            <div style="font-size:0.75rem; color:#94a3b8; margin-top:6px; margin-left:26px;">
-                                        Solo visible para Tuko. El PDF no mostrará que fue a precio de costo.
-                            </div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;margin-left:26px;">
+                                    Solo visible para Tuko. El PDF no mostrará que fue a precio de costo.
+                                </div>
                             </div>
 
-                            <!-- CHECKBOX EXISTENTE de crédito -->
+                            <!-- Venta a crédito -->
                             <div class="form-group">
-                            <label>
-                            <input type="checkbox" id="isCreditSale" onchange="toggleCreditOptions()">
-                            Venta a crédito
-                            </label>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:0.88rem;font-weight:500;">
+                                    <input type="checkbox" id="isCreditSale" onchange="toggleCreditOptions()" style="width:16px;height:16px;">
+                                    Venta a Crédito
+                                </label>
                             </div>
-
-                        
-                            <!--
-                                Panel de crédito, oculto por defecto.
-                                toggleCreditOptions() en invoice.js lo muestra/oculta.
-                            -->
                             <div id="creditOptions" style="display:none;">
                                 <div class="form-group">
                                     <label for="creditDays">Días de plazo</label>
@@ -445,7 +384,6 @@
                             <h3>Seleccionar Productos</h3>
                             <div class="form-group">
                                 <label for="invoiceProduct">Producto</label>
-                                <!-- Populado desde products.js al cargar la página -->
                                 <select id="invoiceProduct">
                                     <option value="">Seleccionar producto</option>
                                 </select>
@@ -458,11 +396,10 @@
                         </div>
                     </div>
 
-                    <!-- Resumen del pedido y acciones -->
                     <div class="invoice-section">
                         <h3>Resumen del Pedido</h3>
                         <div id="invoiceItems" role="list"></div>
-                        <div id="invoiceTotal" class="invoice-total">Total: ₡0.00</div>
+                        <div id="invoiceTotal" class="invoice-total">Total: &#x20A1;0.00</div>
                         <div class="action-buttons" style="margin-top:20px;">
                             <button class="btn btn-success" id="generatePDFBtn">Generar Factura PDF</button>
                             <button class="btn btn-danger"  id="clearInvoiceBtn">Limpiar Pedido</button>
@@ -471,11 +408,7 @@
                 </div>
 
 
-                <!-- ================================================
-                     REPORTES GENERALES
-                     Tarjetas con estadísticas globales.
-                     Valores actualizados por reports.js → loadReports()
-                ================================================ -->
+                <!-- REPORTES GENERALES -->
                 <div id="reports" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Reportes y Estadísticas</h1>
@@ -490,7 +423,7 @@
                             <div>Productos con Stock Bajo</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-number">₡<span id="totalInventoryValueStat">0</span></div>
+                            <div class="stat-number">&#x20A1;<span id="totalInventoryValueStat">0</span></div>
                             <div>Valor del Inventario</div>
                         </div>
                         <div class="stat-card">
@@ -498,18 +431,14 @@
                             <div>Facturas Generadas</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-number">₡<span id="totalSalesStat">0</span></div>
+                            <div class="stat-number">&#x20A1;<span id="totalSalesStat">0</span></div>
                             <div>Total Vendido</div>
                         </div>
                     </div>
                 </div>
 
 
-                <!-- ================================================
-                     REPORTES DE VENTAS
-                     Tabla filtrable por fechas + exportación.
-                     Lógica en reports.js
-                ================================================ -->
+                <!-- REPORTES DE VENTAS -->
                 <div id="sales-reports" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Reportes Detallados de Ventas</h1>
@@ -535,14 +464,14 @@
                     </div>
                     <div class="form-card" style="margin-bottom:20px;">
                         <h3>Resumen del Período</h3>
-                        <p><strong>Total de Ventas:</strong> ₡<span id="periodTotalSales">0.00</span></p>
+                        <p><strong>Total de Ventas:</strong> &#x20A1;<span id="periodTotalSales">0.00</span></p>
                         <p><strong>Facturas en el Período:</strong> <span id="periodInvoiceCount">0</span></p>
-                        <p><strong>Promedio por Factura:</strong> ₡<span id="averageInvoiceAmount">0.00</span></p>
+                        <p><strong>Promedio por Factura:</strong> &#x20A1;<span id="averageInvoiceAmount">0.00</span></p>
                     </div>
                     <div class="pagination" id="salesPagination" style="display:none;">
-                        <button onclick="changeSalesPage(-1)">&laquo; Anterior</button>
+                        <button onclick="changeSalesPage(-1)">Anterior</button>
                         <span id="salesPageInfo">Página 1 de 1</span>
-                        <button onclick="changeSalesPage(1)">Siguiente &raquo;</button>
+                        <button onclick="changeSalesPage(1)">Siguiente</button>
                     </div>
                     <div class="table-wrapper">
                         <table class="sales-table" id="salesTable">
@@ -563,11 +492,7 @@
                 </div>
 
 
-                <!-- ================================================
-                     MANTENIMIENTO
-                     Solo visible para el administrador (Gomez).
-                     Sincronización Firebase, backups y configuración.
-                ================================================ -->
+                <!-- MANTENIMIENTO -->
                 <div id="maintenance" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Mantenimiento del Sistema</h1>
@@ -617,8 +542,8 @@
                             <small style="color:var(--text-muted);">Recomendado: entre 1 000 y 2 000 facturas</small>
                         </div>
                         <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="autoCleanupEnabled">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:0.88rem;font-weight:500;">
+                                <input type="checkbox" id="autoCleanupEnabled" style="width:16px;height:16px;">
                                 Activar limpieza automática
                             </label>
                             <small style="color:var(--text-muted);">Se ejecuta cuando el almacenamiento supera el 80%</small>
@@ -628,17 +553,14 @@
                 </div>
 
 
-                <!-- ================================================
-                     GESTIÓN DE CRÉDITOS
-                     Tabla de cuentas por cobrar. Lógica en credits.js
-                ================================================ -->
+                <!-- GESTIÓN DE CRÉDITOS -->
                 <div id="credits" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Gestión de Créditos</h1>
                     </div>
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <div class="stat-number">₡<span id="totalCreditsAmount">0</span></div>
+                            <div class="stat-number">&#x20A1;<span id="totalCreditsAmount">0</span></div>
                             <div>Saldo Total Pendiente</div>
                         </div>
                         <div class="stat-card">
@@ -656,7 +578,7 @@
                             class="search-box" style="flex:1;margin-bottom:0;"
                             oninput="displayCredits()" aria-label="Buscar créditos">
                         <select id="filterCreditStatus" onchange="displayCredits()"
-                            style="padding:10px;border:1px solid rgba(14,165,233,0.25);border-radius:8px;background:rgba(8,15,38,0.75);color:var(--text-primary);">
+                            style="padding:10px;border:1px solid var(--border-input);border-radius:8px;background:var(--bg-input);color:var(--text-primary);">
                             <option value="all">Todos los estados</option>
                             <option value="pending">Pendientes</option>
                             <option value="overdue">Vencidos</option>
@@ -684,26 +606,18 @@
                 </div>
 
 
-                <!-- ================================================
-                     REPORTES DE CRÉDITOS
-                     Análisis completo de la cartera: KPIs, top deudores
-                     y detalle por período. Lógica en reports.js
-                ================================================ -->
+                <!-- REPORTES DE CRÉDITOS -->
                 <div id="credits-reports" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Reportes de Créditos</h1>
                     </div>
-
-                    <!-- KPIs de la cartera -->
                     <div class="stats-grid" style="margin-bottom:30px;">
-                        <div class="stat-card"><div class="stat-number">₡<span id="reportTotalCredits">0</span></div><div>Total en Créditos</div></div>
-                        <div class="stat-card"><div class="stat-number">₡<span id="reportTotalPaid">0</span></div><div>Total Cobrado</div></div>
-                        <div class="stat-card"><div class="stat-number">₡<span id="reportTotalPending">0</span></div><div>Saldo Pendiente</div></div>
+                        <div class="stat-card"><div class="stat-number">&#x20A1;<span id="reportTotalCredits">0</span></div><div>Total en Créditos</div></div>
+                        <div class="stat-card"><div class="stat-number">&#x20A1;<span id="reportTotalPaid">0</span></div><div>Total Cobrado</div></div>
+                        <div class="stat-card"><div class="stat-number">&#x20A1;<span id="reportTotalPending">0</span></div><div>Saldo Pendiente</div></div>
                         <div class="stat-card"><div class="stat-number" id="reportOverdueCount">0</div><div>Créditos Vencidos</div></div>
                         <div class="stat-card"><div class="stat-number" id="reportRecoveryRate">0%</div><div>Tasa de Recuperación</div></div>
                     </div>
-
-                    <!-- Filtro por fechas y estado -->
                     <div class="date-filter" style="margin-bottom:20px;">
                         <div class="form-group">
                             <label for="creditsReportStartDate">Fecha de Inicio</label>
@@ -727,29 +641,24 @@
                             <button class="btn btn-warning" onclick="clearCreditsReportFilter()">Limpiar Filtro</button>
                         </div>
                     </div>
-
                     <div class="action-buttons" style="margin-bottom:20px;">
                         <button class="btn btn-success" onclick="exportCreditsReportPDF()">Exportar PDF</button>
                         <button class="btn btn-success" onclick="exportCreditsReportExcel()">Exportar Excel</button>
                         <button class="btn" onclick="printCreditsReport()">Imprimir</button>
                     </div>
-
-                    <!-- Resumen numérico del período -->
                     <div class="form-card" style="margin-bottom:20px;">
                         <h3>Resumen del Período Seleccionado</h3>
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;">
                             <div><strong>Créditos Otorgados:</strong><br>
-                                <span style="font-size:1.2em;color:var(--accent-light);">₡<span id="periodCreditsIssued">0.00</span></span></div>
+                                <span style="font-size:1.2em;color:var(--accent-light);">&#x20A1;<span id="periodCreditsIssued">0.00</span></span></div>
                             <div><strong>Pagos Recibidos:</strong><br>
-                                <span style="font-size:1.2em;color:var(--success);">₡<span id="periodPaymentsReceived">0.00</span></span></div>
+                                <span style="font-size:1.2em;color:var(--success);">&#x20A1;<span id="periodPaymentsReceived">0.00</span></span></div>
                             <div><strong>Saldo Pendiente:</strong><br>
-                                <span style="font-size:1.2em;color:var(--danger);">₡<span id="periodBalancePending">0.00</span></span></div>
+                                <span style="font-size:1.2em;color:var(--danger);">&#x20A1;<span id="periodBalancePending">0.00</span></span></div>
                             <div><strong>Clientes con Crédito:</strong><br>
                                 <span style="font-size:1.2em;color:var(--amber-light);"><span id="periodUniqueClients">0</span></span></div>
                         </div>
                     </div>
-
-                    <!-- Top 5 clientes con mayor deuda -->
                     <div class="form-card" style="margin-bottom:20px;">
                         <h3>Clientes con Mayor Deuda</h3>
                         <div class="table-wrapper">
@@ -769,8 +678,6 @@
                             </table>
                         </div>
                     </div>
-
-                    <!-- Detalle completo de créditos -->
                     <div class="form-card">
                         <h3>Detalle Completo de Créditos</h3>
                         <div class="table-wrapper">
@@ -793,75 +700,55 @@
                             </table>
                         </div>
                     </div>
-
-                    <!--
-                        Panel visual de créditos por estado.
-                        Los contadores se actualizan desde reports.js → loadCreditsReport()
-                    -->
                     <div class="form-card" style="margin-top:20px;">
                         <h3>Análisis por Estado</h3>
                         <div style="display:flex;justify-content:space-around;margin-top:20px;flex-wrap:wrap;">
                             <div style="padding:15px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:10px;margin:5px;flex:1;min-width:150px;text-align:center;">
-                                <div style="font-size:2em;color:#4ade80;"><span id="chartPaidCount">0</span></div>
-                                <div style="color:#4ade80;">Pagados</div>
+                                <div style="font-size:2em;color:#4ade80;font-weight:700;"><span id="chartPaidCount">0</span></div>
+                                <div style="color:#4ade80;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;margin-top:4px;">Pagados</div>
                             </div>
                             <div style="padding:15px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:10px;margin:5px;flex:1;min-width:150px;text-align:center;">
-                                <div style="font-size:2em;color:#fcd34d;"><span id="chartPendingCount">0</span></div>
-                                <div style="color:#fcd34d;">Pendientes</div>
+                                <div style="font-size:2em;color:#fcd34d;font-weight:700;"><span id="chartPendingCount">0</span></div>
+                                <div style="color:#fcd34d;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;margin-top:4px;">Pendientes</div>
                             </div>
                             <div style="padding:15px;background:rgba(244,63,94,0.1);border:1px solid rgba(244,63,94,0.25);border-radius:10px;margin:5px;flex:1;min-width:150px;text-align:center;">
-                                <div style="font-size:2em;color:#fb7185;"><span id="chartOverdueCount">0</span></div>
-                                <div style="color:#fb7185;">Vencidos</div>
+                                <div style="font-size:2em;color:#fb7185;font-weight:700;"><span id="chartOverdueCount">0</span></div>
+                                <div style="color:#fb7185;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;margin-top:4px;">Vencidos</div>
                             </div>
                         </div>
                     </div>
-
-                </div><!-- /credits-reports -->
+                </div>
 
             </main>
-        </div><!-- /main-wrapper -->
-    </div><!-- /mainSystem -->
+        </div>
+    </div>
 
 
-    <!-- ============================================================
-         SCRIPTS DEL SISTEMA
-         Orden de carga importante:
-         state → ui → auth → módulos de dominio → app → firebase
-    ============================================================ -->
+    <!-- SCRIPTS — sin carpeta js/ para GitHub Pages -->
     <script src="state.js"></script>
-<script src="ui.js"></script>
-<script src="auth.js"></script>
-<script src="products.js"></script>
-<script src="invoice.js"></script>
-<script src="credits.js"></script>
-<script src="reports.js"></script>
-<script src="maintenance.js"></script>
-<script src="app.js"></script>
-<script src="firebase-integration.js"></script>
+    <script src="ui.js"></script>
+    <script src="auth.js"></script>
+    <script src="products.js"></script>
+    <script src="invoice.js"></script>
+    <script src="credits.js"></script>
+    <script src="reports.js"></script>
+    <script src="maintenance.js"></script>
+    <script src="app.js"></script>
+    <script src="firebase-integration.js"></script>
 
- <script>
-    /*
-     * ============================================================
-     * MÓDULO: NAVEGACIÓN
-     *
-     * Gestiona el sidebar y la navegación tipo SPA (Single Page
-     * Application): muestra/oculta secciones sin recargar la página.
-     * ============================================================
-     */
-
-    /* Referencias DOM del sidebar */
+    <script>
+    /* ============================================================
+       NAVEGACIÓN SPA
+    ============================================================ */
     const sidebar        = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const menuToggle     = document.getElementById('menuToggle');
     const sidebarClose   = document.getElementById('sidebarClose');
 
-    /** Abre el sidebar y activa el overlay (comportamiento móvil) */
     function openSidebar() {
         sidebar.classList.add('open');
         sidebarOverlay.classList.add('show');
     }
-
-    /** Cierra el sidebar y desactiva el overlay */
     function closeSidebar() {
         sidebar.classList.remove('open');
         sidebarOverlay.classList.remove('show');
@@ -869,12 +756,8 @@
 
     menuToggle.addEventListener('click', openSidebar);
     sidebarClose.addEventListener('click', closeSidebar);
-    sidebarOverlay.addEventListener('click', closeSidebar); /* clic fuera cierra el menú */
+    sidebarOverlay.addEventListener('click', closeSidebar);
 
-    /*
-     * Mapa de nombres de sección → título del topbar.
-     * Se actualiza cada vez que el usuario navega a una nueva página.
-     */
     const pageNames = {
         'dashboard'       : 'Panel de Control',
         'inventory'       : 'Inventario',
@@ -887,68 +770,75 @@
         'credits-reports' : 'Reportes de Créditos',
     };
 
-    /**
-     * Navega a la sección indicada.
-     *
-     * Pasos:
-     * 1. Oculta todas las páginas (.page → .hidden)
-     * 2. Quita la clase active de todos los ítems del nav
-     * 3. Muestra la página destino
-     * 4. Marca el ítem del nav correspondiente como activo
-     * 5. Actualiza el título del topbar
-     * 6. Cierra el sidebar en móvil
-     * 7. Notifica a los módulos JS si showTab() está disponible
-     *
-     * @param {string} tabId - ID del div.page a mostrar
-     */
     function navigateTo(tabId) {
-    // Ocultar TODAS las páginas — quitar hidden Y active para evitar estados mixtos
-    document.querySelectorAll('.page').forEach(p => {
-        p.classList.add('hidden');
-        p.classList.remove('active');
-    });
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => {
+            p.classList.add('hidden');
+            p.classList.remove('active');
+        });
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-    // Mostrar solo la página destino
-    const page = document.getElementById(tabId);
-    if (page) {
-        page.classList.remove('hidden');
-        page.classList.add('active');
+        const page = document.getElementById(tabId);
+        if (page) {
+            page.classList.remove('hidden');
+            page.classList.add('active');
+        }
+
+        const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+        if (navItem) navItem.classList.add('active');
+
+        document.getElementById('topbarTitle').textContent = pageNames[tabId] || tabId;
+        closeSidebar();
+
+        if (typeof showTab === 'function') showTab(tabId);
     }
 
-    const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
-    if (navItem) navItem.classList.add('active');
-
-    document.getElementById('topbarTitle').textContent = pageNames[tabId] || tabId;
-
-    closeSidebar();
-
-    if (typeof showTab === 'function') showTab(tabId);
-}
-    /* Registrar navegación en ítems del sidebar */
     document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
         item.addEventListener('click', () => navigateTo(item.dataset.tab));
     });
-
-    /* Registrar navegación en tarjetas del dashboard */
     document.querySelectorAll('.dash-card[data-goto]').forEach(card => {
         card.addEventListener('click', () => navigateTo(card.dataset.goto));
     });
 
-    /*
-     * Atajo de teclado F2:
-     * Navega a Facturación si el sistema principal está activo.
-     * Útil para agilizar el flujo de venta en caja.
-     */
     document.addEventListener('keydown', e => {
         const sistemaActivo = document.getElementById('mainSystem');
         if (e.key === 'F2' && sistemaActivo && !sistemaActivo.classList.contains('hidden')) {
             navigateTo('invoice');
         }
     });
+
+    /* ============================================================
+       MODO CLARO / OSCURO
+    ============================================================ */
+    const themeToggle = document.getElementById('themeToggle');
+    const themeLabel  = document.getElementById('themeLabel');
+
+    function applyTheme(mode) {
+        const icon = themeToggle.querySelector('[data-lucide]');
+        if (mode === 'light') {
+            document.body.classList.add('light-mode');
+            themeLabel.textContent = 'Modo Oscuro';
+            if (icon) icon.setAttribute('data-lucide', 'sun');
+        } else {
+            document.body.classList.remove('light-mode');
+            themeLabel.textContent = 'Modo Claro';
+            if (icon) icon.setAttribute('data-lucide', 'moon');
+        }
+        localStorage.setItem('mariscos_theme', mode);
+        lucide.createIcons();
+    }
+
+    applyTheme(localStorage.getItem('mariscos_theme') || 'dark');
+
+    themeToggle.addEventListener('click', () => {
+        applyTheme(document.body.classList.contains('light-mode') ? 'dark' : 'light');
+    });
+
+    /* ============================================================
+       INICIALIZAR ICONOS LUCIDE
+       Debe ir al final para capturar todos los data-lucide del DOM
+    ============================================================ */
+    lucide.createIcons();
     </script>
 
 </body>
 </html>
-
-
