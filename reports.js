@@ -6,12 +6,15 @@ function updateReports() {
     const lowStock   = products.filter(p => p.stock < 10).length;
     const totalValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
     const totalSales = invoiceHistory.reduce((sum, inv) => sum + inv.total, 0);
+
     document.getElementById('totalProductsStat').textContent       = products.length;
     document.getElementById('lowStockProductsStat').textContent    = lowStock;
     document.getElementById('totalInventoryValueStat').textContent = totalValue.toLocaleString('es-CR', { minimumFractionDigits: 0 });
     document.getElementById('totalInvoicesStat').textContent       = invoiceHistory.length;
     document.getElementById('totalSalesStat').textContent          = totalSales.toLocaleString('es-CR', { minimumFractionDigits: 0 });
 }
+
+// ── Reportes de ventas ──────────────────────────────────────
 
 function displaySalesReports() {
     const today = new Date();
@@ -77,10 +80,10 @@ function updateSalesTable(invoices) {
             <td>${invoice.client.name}</td>
             <td>${invoice.client.phone}</td>
             <td>₡${invoice.total.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</td>
-            <td>
-                <button class="btn btn-sm btn-info"    onclick="showInvoiceDetails('${invoice.number}')">Ver</button>
-                <button class="btn btn-sm btn-success" onclick="reprintInvoicePDF('${invoice.number}')">Reimprimir</button>
-                <button class="btn btn-danger btn-sm"  onclick="deleteInvoice('${invoice.number}')">Eliminar</button>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-info"    onclick="showInvoiceDetails('${invoice.number}')" title="Ver detalles">Ver</button>
+                <button class="btn btn-sm btn-warning" onclick="reprintInvoicePDF('${invoice.number}')"  title="Reimprimir PDF">Reimprimir</button>
+                <button class="btn btn-sm btn-danger"  onclick="deleteInvoice('${invoice.number}')"      title="Eliminar factura">Eliminar</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -106,8 +109,8 @@ function updatePeriodSummary(invoices) {
 
 // ============================================================
 // showInvoiceDetails
-// Modal con todos los datos de la factura + botón reimprimir PDF.
-// Usa data-attributes en lugar de selectores de estilo (más robusto).
+// Modal con detalles completos + botón para reimprimir PDF.
+// Visible para todos los usuarios.
 // ============================================================
 function showInvoiceDetails(invoiceNumber) {
     const invoice = invoiceHistory.find(inv => inv.number === invoiceNumber);
@@ -115,7 +118,6 @@ function showInvoiceDetails(invoiceNumber) {
 
     const fmt = n => n.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    // Construir filas de la tabla de productos
     let itemsHTML = '';
     invoice.items.forEach(item => {
         itemsHTML += `
@@ -131,14 +133,12 @@ function showInvoiceDetails(invoiceNumber) {
         ? '<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:2px 8px;font-size:0.8em;margin-left:8px;">Crédito</span>'
         : '';
 
-    // Crear overlay del modal
     const overlay = document.createElement('div');
     overlay.id = 'invoiceDetailOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:10000;backdrop-filter:blur(2px);';
 
     overlay.innerHTML = `
         <div style="background:#fff;padding:30px;border-radius:12px;max-width:580px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
-
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
                 <div>
                     <h3 style="margin:0;color:#1e293b;font-size:1.2rem;">Detalle de Factura ${creditBadge}</h3>
@@ -146,21 +146,18 @@ function showInvoiceDetails(invoiceNumber) {
                 </div>
                 <button data-close-invoice style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:6px 12px;cursor:pointer;color:#64748b;">Cerrar</button>
             </div>
-
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:16px;">
                 <div><span style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;">Fecha</span><br><strong>${invoice.date}</strong></div>
                 <div><span style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;">Hora</span><br><strong>${invoice.time || 'N/A'}</strong></div>
                 <div><span style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;">Atendido por</span><br><strong>${invoice.user || 'N/A'}</strong></div>
-                <div><span style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;">Tipo de venta</span><br><strong>${invoice.isCredit ? 'Crédito' : 'Contado'}</strong></div>
+                <div><span style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;">Tipo</span><br><strong>${invoice.isCredit ? 'Crédito' : 'Contado'}</strong></div>
             </div>
-
             <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:14px;margin-bottom:16px;">
                 <div style="font-size:0.72rem;color:#0369a1;text-transform:uppercase;margin-bottom:8px;font-weight:600;">Cliente</div>
                 <div><strong>${invoice.client.name}</strong></div>
                 <div style="color:#475569;font-size:0.88rem;">Tel: ${invoice.client.phone}</div>
                 <div style="color:#475569;font-size:0.88rem;">Dir: ${invoice.client.address}</div>
             </div>
-
             <div style="margin-bottom:16px;">
                 <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;margin-bottom:8px;font-weight:600;">Productos</div>
                 <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
@@ -177,15 +174,16 @@ function showInvoiceDetails(invoiceNumber) {
                     </table>
                 </div>
             </div>
-
             <div style="text-align:right;padding:12px 0;border-top:2px solid #e2e8f0;margin-bottom:20px;">
-                <span style="font-size:0.85rem;color:#64748b;">Total de la factura:</span>
+                <span style="font-size:0.85rem;color:#64748b;">Total:</span>
                 <span style="font-size:1.5rem;font-weight:700;color:#f59e0b;margin-left:10px;">₡${fmt(invoice.total)}</span>
             </div>
-
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button data-reprint-invoice style="background:linear-gradient(135deg,#d97706,#fbbf24);border:none;color:#0c1020;font-weight:700;padding:10px 20px;border-radius:8px;cursor:pointer;">
                     Reimprimir PDF
+                </button>
+                <button data-delete-invoice style="background:rgba(244,63,94,0.12);border:1px solid rgba(244,63,94,0.35);color:#fb7185;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;">
+                    Eliminar
                 </button>
                 <button data-close-invoice style="background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;padding:10px 20px;border-radius:8px;cursor:pointer;">
                     Cerrar
@@ -196,28 +194,28 @@ function showInvoiceDetails(invoiceNumber) {
 
     document.body.appendChild(overlay);
 
-    // Función centralizada de cierre — sin selector de estilos
     const closeModal = () => {
         const el = document.getElementById('invoiceDetailOverlay');
         if (el) el.remove();
     };
 
-    // Todos los botones con data-close-invoice cierran el modal
     overlay.querySelectorAll('[data-close-invoice]').forEach(btn => btn.addEventListener('click', closeModal));
-
-    // Clic fuera del panel también cierra
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
-    // Botón de reimpresión
     overlay.querySelector('[data-reprint-invoice]').addEventListener('click', () => {
         reprintInvoicePDF(invoiceNumber);
+    });
+
+    // Botón eliminar dentro del modal — disponible para todos
+    overlay.querySelector('[data-delete-invoice]').addEventListener('click', () => {
+        closeModal();
+        deleteInvoice(invoiceNumber);
     });
 }
 
 // ============================================================
 // reprintInvoicePDF
-// Regenera el PDF de voucher de una factura ya guardada.
-// Reutiliza generateInvoiceVoucherPDF() de invoice.js
+// Regenera el voucher PDF de una factura ya guardada.
 // ============================================================
 function reprintInvoicePDF(invoiceNumber) {
     const invoice = invoiceHistory.find(inv => inv.number === invoiceNumber);
@@ -225,7 +223,6 @@ function reprintInvoicePDF(invoiceNumber) {
 
     const doc = generateInvoiceVoucherPDF(invoice);
 
-    // Si fue crédito, agregar la nota igual que en la emisión original
     if (invoice.isCredit) {
         const creditInfo = creditSales.find(c => c.invoiceNumber === invoiceNumber);
         if (creditInfo) {
@@ -242,21 +239,36 @@ function reprintInvoicePDF(invoiceNumber) {
     showAlert('PDF de ' + invoiceNumber + ' generado exitosamente', 'success');
 }
 
+// ============================================================
+// deleteInvoice
+// Elimina la factura de localStorage y restaura el stock.
+// firebase-integration.js intercepta y borra también de Firebase.
+// Disponible para todos los usuarios.
+// ============================================================
 function deleteInvoice(invoiceNumber) {
     const idx = invoiceHistory.findIndex(inv => inv.number === invoiceNumber);
     if (idx === -1) { showAlert('Factura no encontrada', 'danger'); return; }
     const invoice = invoiceHistory[idx];
     if (!confirm(`ELIMINAR FACTURA\n\nFactura: ${invoice.number}\nCliente: ${invoice.client.name}\nTotal: ₡${invoice.total.toLocaleString('es-CR')}\nFecha: ${invoice.date}\n\n¿Estás seguro?\n\nSe restaurará el stock de los productos.`)) return;
+
+    // Restaurar stock de cada producto de la factura
     invoice.items.forEach(item => {
         const product = products.find(p => p.id === item.productId);
-        if (product) { product.stock += item.quantity; product.updatedAt = new Date().toISOString(); }
+        if (product) {
+            product.stock     += item.quantity;
+            product.updatedAt  = new Date().toISOString();
+        }
     });
+
     invoiceHistory.splice(idx, 1);
     saveProducts();
     saveInvoices();
+    // firebase-integration.js intercepta saveInvoices y también
+    // borra el documento de Firestore vía el patch de deleteInvoice
     showAlert(`Factura ${invoice.number} eliminada. Stock restaurado.`, 'success');
     filterSales();
     updateReports();
+    if (typeof updateDashboard === 'function') updateDashboard();
 }
 
 // ── Exportación de ventas ───────────────────────────────────
@@ -299,9 +311,12 @@ function exportSalesToExcel() {
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte de Ventas');
     const totalV = filtered.reduce((s, i) => s + i.total, 0);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-        ['RESUMEN DEL PERÍODO'],[''],['Total de Facturas', filtered.length],
-        ['Total Vendido', totalV],['Promedio por Factura', filtered.length > 0 ? totalV / filtered.length : 0],
-        [''],['Generado por', currentUser],['Fecha de generación', new Date().toLocaleString('es-CR')]
+        ['RESUMEN DEL PERÍODO'], [''],
+        ['Total de Facturas', filtered.length],
+        ['Total Vendido', totalV],
+        ['Promedio por Factura', filtered.length > 0 ? totalV / filtered.length : 0],
+        [''], ['Generado por', currentUser],
+        ['Fecha de generación', new Date().toLocaleString('es-CR')]
     ]), 'Resumen');
     const startDate = document.getElementById('startDate').value;
     const endDate   = document.getElementById('endDate').value;
@@ -379,11 +394,16 @@ function updateCreditsReportStats(filtered) {
     document.getElementById('periodUniqueClients').textContent    = new Set(filtered.map(c => c.client.name)).size;
 }
 
+// ============================================================
+// updateCreditsReportTable
+// Muestra el detalle de créditos con botón Reimprimir para
+// todos los usuarios. La columna Acciones es la décima.
+// ============================================================
 function updateCreditsReportTable(filtered) {
     const tbody = document.getElementById('creditsReportTableBody');
     tbody.innerHTML = '';
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No hay créditos en el período seleccionado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">No hay créditos en el período seleccionado</td></tr>';
         return;
     }
     const fmt   = n => n.toLocaleString('es-CR', { minimumFractionDigits: 2 });
@@ -392,21 +412,29 @@ function updateCreditsReportTable(filtered) {
         const saleDate  = new Date(credit.saleDate);
         const dueDate   = new Date(credit.dueDate);
         let statusClass = 'credit-pending', statusText = 'Pendiente';
-        if (credit.status === 'paid')    { statusClass = 'credit-paid';    statusText = 'Pagado'; }
+        if (credit.status === 'paid')    { statusClass = 'credit-paid';    statusText = 'Pagado';  }
         if (credit.status === 'overdue') { statusClass = 'credit-overdue'; statusText = 'Vencido'; }
         const daysSinceSale = Math.floor((today - saleDate) / 86400000);
         const daysOverdue   = credit.status === 'overdue' ? Math.floor((today - dueDate) / 86400000) : 0;
-        const daysDisplay   = credit.status === 'paid'    ? `${daysSinceSale}d` :
-            (credit.status === 'overdue' ? `<span style="color:#e74c3c;">${daysOverdue}d vencido</span>` : `${daysSinceSale}d`);
+        const daysDisplay   = credit.status === 'paid'
+            ? `${daysSinceSale}d`
+            : (credit.status === 'overdue'
+                ? `<span style="color:#e74c3c;">${daysOverdue}d vencido</span>`
+                : `${daysSinceSale}d`);
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${credit.invoiceNumber}</td><td>${credit.client.name}</td>
-            <td>${saleDate.toLocaleDateString('es-CR')}</td><td>${dueDate.toLocaleDateString('es-CR')}</td>
-            <td>₡${fmt(credit.totalAmount)}</td><td>₡${fmt(credit.paidAmount)}</td>
+            <td>${credit.invoiceNumber}</td>
+            <td>${credit.client.name}</td>
+            <td>${saleDate.toLocaleDateString('es-CR')}</td>
+            <td>${dueDate.toLocaleDateString('es-CR')}</td>
+            <td>₡${fmt(credit.totalAmount)}</td>
+            <td>₡${fmt(credit.paidAmount)}</td>
             <td><strong>₡${fmt(credit.balance)}</strong></td>
             <td><span class="credit-status ${statusClass}">${statusText}</span></td>
             <td>${daysDisplay}</td>
-            <td><button class="btn btn-sm btn-warning" onclick="reprintInvoicePDF('${credit.invoiceNumber}')">Reimprimir</button></td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-warning" onclick="reprintInvoicePDF('${credit.invoiceNumber}')" title="Reimprimir factura">Reimprimir</button>
+            </td>
         `;
         tbody.appendChild(row);
     });
@@ -429,9 +457,13 @@ function updateTopDebtors() {
     }
     sorted.forEach((d, i) => {
         const row = document.createElement('tr');
-        row.innerHTML = `<td><strong>${i+1}</strong></td><td>${d.name}</td><td>${d.activeCredits}</td>
+        row.innerHTML = `
+            <td><strong>${i+1}</strong></td>
+            <td>${d.name}</td>
+            <td>${d.activeCredits}</td>
             <td><strong>₡${d.totalDebt.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</strong></td>
-            <td>${d.overdueCount > 0 ? `<span style="color:#e74c3c;">${d.overdueCount}</span>` : '0'}</td>`;
+            <td>${d.overdueCount > 0 ? `<span style="color:#e74c3c;">${d.overdueCount}</span>` : '0'}</td>
+        `;
         tbody.appendChild(row);
     });
 }
@@ -465,9 +497,13 @@ function exportCreditsReportPDF() {
     doc.text(`Saldo Pendiente: ₡${totalPending.toLocaleString('es-CR')}`, 20, 110);
     doc.autoTable({
         head: [['Factura','Cliente','Fecha','Total','Saldo','Estado']],
-        body: filtered.map(c => [c.invoiceNumber, c.client.name, new Date(c.saleDate).toLocaleDateString('es-CR'),
-            `₡${c.totalAmount.toLocaleString('es-CR')}`, `₡${c.balance.toLocaleString('es-CR')}`,
-            c.status === 'paid' ? 'Pagado' : (c.status === 'overdue' ? 'Vencido' : 'Pendiente')]),
+        body: filtered.map(c => [
+            c.invoiceNumber, c.client.name,
+            new Date(c.saleDate).toLocaleDateString('es-CR'),
+            `₡${c.totalAmount.toLocaleString('es-CR')}`,
+            `₡${c.balance.toLocaleString('es-CR')}`,
+            c.status === 'paid' ? 'Pagado' : (c.status === 'overdue' ? 'Vencido' : 'Pendiente')
+        ]),
         startY: 120, theme: 'striped', headStyles: { fillColor: [52, 152, 219] }, styles: { fontSize: 8 }
     });
     doc.save(startDate && endDate ? `reporte_creditos_${startDate}_${endDate}.pdf` : 'reporte_creditos_completo.pdf');
@@ -487,12 +523,18 @@ function exportCreditsReportExcel() {
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte de Créditos');
-    const tA = filtered.reduce((s,c)=>s+c.totalAmount,0), tP = filtered.reduce((s,c)=>s+c.paidAmount,0), tB = filtered.reduce((s,c)=>s+c.balance,0);
+    const tA = filtered.reduce((s,c) => s+c.totalAmount, 0);
+    const tP = filtered.reduce((s,c) => s+c.paidAmount, 0);
+    const tB = filtered.reduce((s,c) => s+c.balance, 0);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-        ['RESUMEN DE CRÉDITOS'],[''],['Total de Créditos', filtered.length],
-        ['Monto Total Otorgado', tA],['Monto Total Cobrado', tP],['Saldo Pendiente', tB],
+        ['RESUMEN DE CRÉDITOS'], [''],
+        ['Total de Créditos', filtered.length],
+        ['Monto Total Otorgado', tA],
+        ['Monto Total Cobrado', tP],
+        ['Saldo Pendiente', tB],
         ['Tasa de Recuperación', tA > 0 ? `${Math.round((tP/tA)*100)}%` : '0%'],
-        [''],['Generado por', currentUser],['Fecha de generación', new Date().toLocaleString('es-CR')]
+        [''], ['Generado por', currentUser],
+        ['Fecha de generación', new Date().toLocaleString('es-CR')]
     ]), 'Resumen');
     const startDate = document.getElementById('creditsReportStartDate').value;
     const endDate   = document.getElementById('creditsReportEndDate').value;
