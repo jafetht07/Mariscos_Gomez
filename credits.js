@@ -30,10 +30,18 @@ function updateCreditsStats() {
     document.getElementById('overdueCreditsCount').textContent = overdueCount;
 }
 
+// ============================================================
+// displayCredits
+// Tabla de créditos con acciones para todos los usuarios:
+// - Registrar pago (si no está pagado)
+// - Ver detalles
+// - Reimprimir factura
+// - Eliminar crédito (borra de Firebase y localStorage)
+// ============================================================
 function displayCredits() {
     const tbody       = document.getElementById('creditsTableBody');
     const searchTerm  = document.getElementById('searchCredits').value.toLowerCase();
-    const statusFilter= document.getElementById('filterCreditStatus').value;
+    const statusFilter = document.getElementById('filterCreditStatus').value;
     const fmt = n => n.toLocaleString('es-CR', { minimumFractionDigits: 2 });
 
     let filtered = creditSales;
@@ -55,9 +63,9 @@ function displayCredits() {
     [...filtered].reverse().forEach(credit => {
         const saleDate = new Date(credit.saleDate);
         const dueDate  = new Date(credit.dueDate);
-        let statusClass = 'credit-pending', statusText = '⏳ Pendiente';
-        if (credit.status === 'paid')    { statusClass = 'credit-paid';    statusText = '✅ Pagado'; }
-        if (credit.status === 'overdue') { statusClass = 'credit-overdue'; statusText = '⚠️ Vencido'; }
+        let statusClass = 'credit-pending', statusText = 'Pendiente';
+        if (credit.status === 'paid')    { statusClass = 'credit-paid';    statusText = 'Pagado';  }
+        if (credit.status === 'overdue') { statusClass = 'credit-overdue'; statusText = 'Vencido'; }
 
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -69,11 +77,13 @@ function displayCredits() {
             <td>₡${fmt(credit.paidAmount)}</td>
             <td><strong>₡${fmt(credit.balance)}</strong></td>
             <td><span class="credit-status ${statusClass}">${statusText}</span></td>
-            <td>
-                ${credit.status !== 'paid' ? `<button class="btn btn-success btn-sm" onclick="showPaymentModal(${credit.id})" title="Registrar pago">Pago</button>` : ''}
-                <button class="btn btn-sm" onclick="showCreditDetails(${credit.id})" title="Ver detalles">Ver</button>
-                <button class="btn btn-sm btn-warning" onclick="reprintInvoicePDF('${credit.invoiceNumber}')" title="Reimprimir factura">Reimprimir</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteCredit(${credit.id})" title="Eliminar">Eliminar</button>
+            <td style="white-space:nowrap;">
+                ${credit.status !== 'paid'
+                    ? `<button class="btn btn-success btn-sm" onclick="showPaymentModal(${credit.id})" title="Registrar pago">Pago</button>`
+                    : ''}
+                <button class="btn btn-sm btn-info"    onclick="showCreditDetails(${credit.id})"           title="Ver detalles">Ver</button>
+                <button class="btn btn-sm btn-warning" onclick="reprintInvoicePDF('${credit.invoiceNumber}')" title="Reimprimir">Reimprimir</button>
+                <button class="btn btn-danger btn-sm"  onclick="deleteCredit(${credit.id})"                title="Eliminar">Eliminar</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -83,7 +93,7 @@ function displayCredits() {
 }
 
 // ============================================================
-// showPaymentModal — Modal para registrar un pago parcial o total
+// showPaymentModal — Modal para registrar pago
 // ============================================================
 function showPaymentModal(creditId) {
     const credit = creditSales.find(c => c.id === creditId);
@@ -95,8 +105,11 @@ function showPaymentModal(creditId) {
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;justify-content:center;align-items:center;z-index:10000;';
     overlay.innerHTML = `
         <div style="background:white;padding:30px;border-radius:10px;max-width:500px;width:90%;">
-            <h3 style="text-align:center;color:#2c3e50;margin-top:0;">Registrar Pago</h3>
-            <hr style="margin:15px 0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h3 style="margin:0;color:#2c3e50;">Registrar Pago</h3>
+                <button data-close style="background:none;border:1px solid #ddd;border-radius:6px;padding:5px 11px;cursor:pointer;color:#666;">Cerrar</button>
+            </div>
+            <hr style="margin:0 0 15px;">
             <p><strong>Cliente:</strong> ${credit.client.name}</p>
             <p><strong>Factura:</strong> ${credit.invoiceNumber}</p>
             <p><strong>Saldo Pendiente:</strong> <span style="color:#e74c3c;font-size:1.2em;">₡${fmt(credit.balance)}</span></p>
@@ -112,10 +125,10 @@ function showPaymentModal(creditId) {
                     style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;">
             </div>
             <div style="display:flex;gap:10px;margin-top:20px;">
-                <button data-register-payment style="flex:1;background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.35);color:#166534;font-weight:600;padding:10px;border-radius:6px;cursor:pointer;">
+                <button data-register style="flex:1;background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.35);color:#166534;font-weight:600;padding:10px;border-radius:6px;cursor:pointer;">
                     Registrar Pago
                 </button>
-                <button data-close-modal style="flex:1;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;padding:10px;border-radius:6px;cursor:pointer;">
+                <button data-close style="flex:1;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;padding:10px;border-radius:6px;cursor:pointer;">
                     Cancelar
                 </button>
             </div>
@@ -124,22 +137,19 @@ function showPaymentModal(creditId) {
 
     document.body.appendChild(overlay);
 
-    // Cierre: botón cancelar y clic fuera del panel
     const closeModal = () => {
         const el = document.getElementById('paymentModalOverlay');
         if (el) el.remove();
     };
-    overlay.querySelector('[data-close-modal]').addEventListener('click', closeModal);
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
-    // Registrar pago al hacer clic en el botón principal
-    overlay.querySelector('[data-register-payment]').addEventListener('click', () => {
-        registerPayment(creditId);
-    });
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeModal));
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+    overlay.querySelector('[data-register]').addEventListener('click', () => registerPayment(creditId));
 }
 
 // ============================================================
-// registerPayment — Procesa el abono y actualiza el crédito
+// registerPayment — Procesa el abono y actualiza el crédito.
+// firebase-integration.js intercepta y sincroniza a Firestore.
 // ============================================================
 function registerPayment(creditId) {
     const credit = creditSales.find(c => c.id === creditId);
@@ -148,8 +158,8 @@ function registerPayment(creditId) {
     const amount = parseFloat(document.getElementById('paymentAmount').value);
     const notes  = document.getElementById('paymentNotes').value || '';
 
-    if (!amount || amount <= 0) { showAlert('Por favor ingresa un monto válido', 'danger'); return; }
-    if (amount > credit.balance) { showAlert('El monto no puede ser mayor al saldo pendiente', 'danger'); return; }
+    if (!amount || amount <= 0)     { showAlert('Por favor ingresa un monto válido', 'danger'); return; }
+    if (amount > credit.balance)    { showAlert('El monto no puede ser mayor al saldo pendiente', 'danger'); return; }
 
     credit.payments.push({ amount, date: new Date().toISOString(), notes, registeredBy: currentUser });
     credit.paidAmount += amount;
@@ -165,16 +175,15 @@ function registerPayment(creditId) {
 
     saveCredits();
 
-    // Cerrar el modal con ID en lugar de selector de estilos
     const el = document.getElementById('paymentModalOverlay');
     if (el) el.remove();
 
     displayCredits();
-    updateDashboard(); // refrescar créditos activos
+    if (typeof updateDashboard === 'function') updateDashboard();
 }
 
 // ============================================================
-// showCreditDetails — Modal con el historial completo del crédito
+// showCreditDetails — Modal con historial completo del crédito
 // ============================================================
 function showCreditDetails(creditId) {
     const credit = creditSales.find(c => c.id === creditId);
@@ -195,10 +204,6 @@ function showCreditDetails(creditId) {
         paymentsHTML += '</div>';
     }
 
-    const notesHTML = credit.notes
-        ? `<p><strong>Notas:</strong> ${credit.notes}</p>`
-        : '';
-
     const overlay = document.createElement('div');
     overlay.id = 'creditDetailOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;justify-content:center;align-items:center;z-index:10000;';
@@ -207,7 +212,7 @@ function showCreditDetails(creditId) {
         <div style="background:white;padding:30px;border-radius:10px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                 <h3 style="margin:0;color:#2c3e50;">Detalles del Crédito</h3>
-                <button data-close-modal style="background:none;border:1px solid #ddd;border-radius:6px;padding:6px 12px;cursor:pointer;color:#666;">Cerrar</button>
+                <button data-close style="background:none;border:1px solid #ddd;border-radius:6px;padding:5px 11px;cursor:pointer;color:#666;">Cerrar</button>
             </div>
             <hr style="margin:0 0 15px;">
             <p><strong>Factura:</strong> ${credit.invoiceNumber}</p>
@@ -219,10 +224,13 @@ function showCreditDetails(creditId) {
             <p><strong>Monto Total:</strong> ₡${fmt(credit.totalAmount)}</p>
             <p><strong>Monto Pagado:</strong> ₡${fmt(credit.paidAmount)}</p>
             <p><strong>Saldo Pendiente:</strong> <span style="color:#e74c3c;font-size:1.2em;">₡${fmt(credit.balance)}</span></p>
-            ${notesHTML}
+            ${credit.notes ? `<p><strong>Notas:</strong> ${credit.notes}</p>` : ''}
             ${paymentsHTML}
-            <div style="text-align:center;margin-top:20px;">
-                <button data-close-modal style="background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;padding:10px 24px;border-radius:6px;cursor:pointer;">
+            <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+                <button data-reprint style="background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.35);color:#92400e;font-weight:600;padding:10px 18px;border-radius:6px;cursor:pointer;">
+                    Reimprimir Factura
+                </button>
+                <button data-close style="background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;padding:10px 18px;border-radius:6px;cursor:pointer;">
                     Cerrar
                 </button>
             </div>
@@ -231,11 +239,33 @@ function showCreditDetails(creditId) {
 
     document.body.appendChild(overlay);
 
-    // Cierre robusto con data-attribute — sin selectores de estilo
     const closeModal = () => {
         const el = document.getElementById('creditDetailOverlay');
         if (el) el.remove();
     };
-    overlay.querySelectorAll('[data-close-modal]').forEach(btn => btn.addEventListener('click', closeModal));
+
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeModal));
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+    overlay.querySelector('[data-reprint]').addEventListener('click', () => {
+        reprintInvoicePDF(credit.invoiceNumber);
+    });
+}
+
+// ============================================================
+// deleteCredit
+// Elimina el crédito de localStorage.
+// firebase-integration.js intercepta mediante patch y también
+// lo borra de Firestore automáticamente.
+// Disponible para todos los usuarios.
+// ============================================================
+function deleteCredit(creditId) {
+    const credit = creditSales.find(c => c.id === creditId);
+    if (!credit) return;
+    if (!confirm(`¿Eliminar crédito de ${credit.client.name}?\nFactura: ${credit.invoiceNumber}\n\nEsta acción no se puede deshacer.`)) return;
+
+    creditSales = creditSales.filter(c => c.id !== creditId);
+    saveCredits();
+    displayCredits();
+    if (typeof updateDashboard === 'function') updateDashboard();
+    showAlert('Crédito eliminado exitosamente', 'success');
 }
