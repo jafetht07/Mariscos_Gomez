@@ -162,47 +162,65 @@
     };
 
     // ── Guardar productos en Firestore ─────────────────────────
+    // Divide en lotes de 499 para no superar el límite de Firestore
     async function firebaseSaveProducts(){
         try {
             if (!window.__mariscos_db) throw new Error('No firestore');
-            const db = window.__mariscos_db;
-            const batch = db.batch();
-            (products || []).forEach(p => {
-                batch.set(db.collection('products').doc(String(p.id)), p);
-            });
-            await batch.commit();
-            console.log('✅ Productos sincronizados a Firebase');
+            const db   = window.__mariscos_db;
+            const all  = (products || []);
+            const SIZE = 499;
+            for (let i = 0; i < all.length; i += SIZE) {
+                const chunk = all.slice(i, i + SIZE);
+                const batch = db.batch();
+                chunk.forEach(p => {
+                    batch.set(db.collection('products').doc(String(p.id)), p);
+                });
+                await batch.commit();
+            }
+            console.log('✅ Productos sincronizados a Firebase:', all.length);
             return true;
         } catch(e){ console.error('Error firebaseSaveProducts', e); return false; }
     }
 
     // ── Guardar facturas en Firestore ──────────────────────────
+    // Divide en lotes de 499 para no superar el límite de Firestore
     async function firebaseSaveInvoices(){
         try {
             if (!window.__mariscos_db) throw new Error('No firestore');
-            const db = window.__mariscos_db;
-            const batch = db.batch();
-            const toSync = (invoiceHistory || []).slice(-500);
-            toSync.forEach(inv => {
-                batch.set(db.collection('invoices').doc(String(inv.number)), inv);
-            });
-            await batch.commit();
-            console.log('✅ Facturas sincronizadas a Firebase');
+            const db   = window.__mariscos_db;
+            const all  = (invoiceHistory || []);
+            const SIZE = 499; // límite seguro por batch
+
+            for (let i = 0; i < all.length; i += SIZE) {
+                const chunk = all.slice(i, i + SIZE);
+                const batch = db.batch();
+                chunk.forEach(inv => {
+                    batch.set(db.collection('invoices').doc(String(inv.number)), inv);
+                });
+                await batch.commit();
+            }
+            console.log('✅ Facturas sincronizadas a Firebase:', all.length);
             return true;
         } catch(e){ console.error('Error firebaseSaveInvoices', e); return false; }
     }
 
     // ── Guardar créditos en Firestore ──────────────────────────
+    // Divide en lotes de 499 para no superar el límite de Firestore
     async function firebaseSaveCredits(){
         try {
             if (!window.__mariscos_db) throw new Error('No firestore');
-            const db = window.__mariscos_db;
-            const batch = db.batch();
-            (creditSales || []).forEach(c => {
-                batch.set(db.collection('credits').doc(String(c.id)), c);
-            });
-            await batch.commit();
-            console.log('✅ Créditos sincronizados a Firebase');
+            const db   = window.__mariscos_db;
+            const all  = (creditSales || []);
+            const SIZE = 499;
+            for (let i = 0; i < all.length; i += SIZE) {
+                const chunk = all.slice(i, i + SIZE);
+                const batch = db.batch();
+                chunk.forEach(c => {
+                    batch.set(db.collection('credits').doc(String(c.id)), c);
+                });
+                await batch.commit();
+            }
+            console.log('✅ Créditos sincronizados a Firebase:', all.length);
             return true;
         } catch(e){ console.error('Error firebaseSaveCredits', e); return false; }
     }
