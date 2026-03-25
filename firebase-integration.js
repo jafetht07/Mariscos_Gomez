@@ -1,9 +1,6 @@
 // ============================================================
 // firebase-integration.js
 // Backend: sincronización con Firebase Firestore en tiempo real.
-// onSnapshot escucha cambios en todas las colecciones.
-// _syncingFromFirebase bloquea el re-upload cuando el cambio
-// viene de otro dispositivo, evitando el ciclo de restauración.
 // ============================================================
 (function(){
     if (window.__MARISCOS_FIREBASE_INTEGRATED) return;
@@ -24,14 +21,8 @@
     let _unsubCredits    = null;
     let _initialLoadDone = false;
 
-    // ============================================================
-    // _syncingFromFirebase
-    // Cuando onSnapshot actualiza los datos locales, este flag
-    // se pone en true para que los decorators de saveProducts,
-    // saveInvoices y saveCredits NO suban nada a Firebase.
-    // Así se evita el ciclo: Firebase borra → onSnapshot actualiza
-    // local → saveInvoices sube de vuelta lo que se borró.
-    // ============================================================
+    // Flag para evitar el ciclo: onSnapshot actualiza local
+    // → decorator sube de vuelta lo que se borró en otro dispositivo
     window.__mariscos_syncingFromFirebase = false;
 
     // ── Carga dinámica de scripts ──────────────────────────────
@@ -69,22 +60,15 @@
         }
     }
 
-    // ============================================================
-    // activateRealtimeListeners
-    // Escucha cambios en Firestore en tiempo real.
-    // Usa _syncingFromFirebase = true mientras actualiza el local
-    // para evitar que los decorators suban de vuelta los datos.
-    // ============================================================
+    // ── Listeners en tiempo real ───────────────────────────────
     function activateRealtimeListeners(){
         const db = window.__mariscos_db;
         if (!db) return;
 
-        // ── Productos ──────────────────────────────────────────
+        // Productos
         _unsubProducts = db.collection('products').onSnapshot(snap => {
             if (!_initialLoadDone) return;
-
             window.__mariscos_syncingFromFirebase = true;
-
             const remote = [];
             snap.forEach(d => remote.push(d.data()));
             products = remote;
@@ -92,45 +76,35 @@
                 nextProductId = Math.max(...products.map(p => p.id)) + 1;
             localStorage.setItem('mariscos_products', JSON.stringify(products));
             localStorage.setItem('mariscos_next_id', nextProductId.toString());
-
             window.__mariscos_syncingFromFirebase = false;
-
-            console.log('🔄 Productos actualizados en tiempo real:', products.length);
+            console.log('🔄 Productos en tiempo real:', products.length);
             if (typeof displayProducts === 'function')            displayProducts();
             if (typeof updateReports === 'function')              updateReports();
             if (typeof updateDashboard === 'function')            updateDashboard();
             if (typeof updateInvoiceProductSelect === 'function') updateInvoiceProductSelect();
             if (typeof updateStorageMonitor === 'function')       updateStorageMonitor();
-
         }, err => console.error('Error listener productos:', err));
 
-        // ── Facturas ───────────────────────────────────────────
+        // Facturas — sin orderBy ni limit para evitar índice compuesto
         _unsubInvoices = db.collection('invoices').onSnapshot(snap => {
-                if (!_initialLoadDone) return;
+            if (!_initialLoadDone) return;
+            window.__mariscos_syncingFromFirebase = true;
+            const remote = [];
+            snap.forEach(d => remote.push(d.data()));
+            invoiceHistory = remote;
+            localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
+            window.__mariscos_syncingFromFirebase = false;
+            console.log('🔄 Facturas en tiempo real:', invoiceHistory.length);
+            if (typeof updateReports === 'function')        updateReports();
+            if (typeof updateDashboard === 'function')      updateDashboard();
+            if (typeof filterSales === 'function')          filterSales();
+            if (typeof updateStorageMonitor === 'function') updateStorageMonitor();
+        }, err => console.error('Error listener facturas:', err));
 
-                window.__mariscos_syncingFromFirebase = true;
-
-                const remote = [];
-                snap.forEach(d => remote.push(d.data()));
-                invoiceHistory = remote;
-                localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
-
-                window.__mariscos_syncingFromFirebase = false;
-
-                console.log('🔄 Facturas actualizadas en tiempo real:', invoiceHistory.length);
-                if (typeof updateReports === 'function')        updateReports();
-                if (typeof updateDashboard === 'function')      updateDashboard();
-                if (typeof filterSales === 'function')          filterSales();
-                if (typeof updateStorageMonitor === 'function') updateStorageMonitor();
-
-            }, err => console.error('Error listener facturas:', err));
-
-        // ── Créditos ───────────────────────────────────────────
+        // Créditos
         _unsubCredits = db.collection('credits').onSnapshot(snap => {
             if (!_initialLoadDone) return;
-
             window.__mariscos_syncingFromFirebase = true;
-
             const remote = [];
             snap.forEach(d => remote.push(d.data()));
             creditSales = remote;
@@ -138,14 +112,11 @@
                 nextCreditId = Math.max(...creditSales.map(c => c.id)) + 1;
             localStorage.setItem('mariscos_credits', JSON.stringify(creditSales));
             localStorage.setItem('mariscos_next_credit_id', nextCreditId.toString());
-
             window.__mariscos_syncingFromFirebase = false;
-
-            console.log('🔄 Créditos actualizados en tiempo real:', creditSales.length);
+            console.log('🔄 Créditos en tiempo real:', creditSales.length);
             if (typeof displayCredits === 'function')         displayCredits();
             if (typeof updateDashboard === 'function')        updateDashboard();
             if (typeof updateStorageMonitor === 'function')   updateStorageMonitor();
-
         }, err => console.error('Error listener créditos:', err));
 
         console.log('✅ Listeners en tiempo real activados');
@@ -158,69 +129,76 @@
         if (_unsubCredits)  { _unsubCredits();  _unsubCredits  = null; }
         _initialLoadDone = false;
         window.__mariscos_syncingFromFirebase = false;
-        console.log('🔌 Listeners de Firebase desconectados');
+        console.log('🔌 Listeners desconectados');
     };
 
-    // ── Guardar productos en Firestore ─────────────────────────
-    // Divide en lotes de 499 para no superar el límite de Firestore
+    // ── Guardar productos (batch por chunks de 499) ────────────
     async function firebaseSaveProducts(){
         try {
             if (!window.__mariscos_db) throw new Error('No firestore');
-            const db   = window.__mariscos_db;
-            const all  = (products || []);
-            const SIZE = 499;
-            for (let i = 0; i < all.length; i += SIZE) {
-                const chunk = all.slice(i, i + SIZE);
+            const db  = window.__mariscos_db;
+            const all = (products || []);
+            for (let i = 0; i < all.length; i += 499){
                 const batch = db.batch();
-                chunk.forEach(p => {
+                all.slice(i, i + 499).forEach(p => {
                     batch.set(db.collection('products').doc(String(p.id)), p);
                 });
                 await batch.commit();
             }
-            console.log('✅ Productos sincronizados a Firebase:', all.length);
+            console.log('✅ Productos sincronizados:', all.length);
             return true;
         } catch(e){ console.error('Error firebaseSaveProducts', e); return false; }
     }
 
-    // ── Guardar facturas en Firestore ──────────────────────────
-    // Divide en lotes de 499 para no superar el límite de Firestore
+    // ── Guardar UNA factura (la más reciente) ──────────────────
+    // Usar set individual evita reescribir toda la colección
+    // y elimina la carrera que borraba facturas al llegar a 7+
     async function firebaseSaveInvoices(){
         try {
             if (!window.__mariscos_db) throw new Error('No firestore');
-            const db   = window.__mariscos_db;
-            const all  = (invoiceHistory || []);
-            const SIZE = 499; // límite seguro por batch
-
-            for (let i = 0; i < all.length; i += SIZE) {
-                const chunk = all.slice(i, i + SIZE);
-                const batch = db.batch();
-                chunk.forEach(inv => {
-                    batch.set(db.collection('invoices').doc(String(inv.number)), inv);
-                });
-                await batch.commit();
-            }
-            console.log('✅ Facturas sincronizadas a Firebase:', all.length);
+            const db  = window.__mariscos_db;
+            const all = (invoiceHistory || []);
+            if (all.length === 0) return true;
+            // Solo guardar la última — las anteriores ya están en Firebase
+            const last = all[all.length - 1];
+            await db.collection('invoices').doc(String(last.number)).set(last);
+            console.log('✅ Factura guardada en Firebase:', last.number);
             return true;
         } catch(e){ console.error('Error firebaseSaveInvoices', e); return false; }
     }
 
-    // ── Guardar créditos en Firestore ──────────────────────────
-    // Divide en lotes de 499 para no superar el límite de Firestore
+    // ── Guardar TODAS las facturas (para sync y migración) ─────
+    async function firebaseSaveAllInvoices(){
+        try {
+            if (!window.__mariscos_db) throw new Error('No firestore');
+            const db  = window.__mariscos_db;
+            const all = (invoiceHistory || []);
+            for (let i = 0; i < all.length; i += 499){
+                const batch = db.batch();
+                all.slice(i, i + 499).forEach(inv => {
+                    batch.set(db.collection('invoices').doc(String(inv.number)), inv);
+                });
+                await batch.commit();
+            }
+            console.log('✅ Todas las facturas sincronizadas:', all.length);
+            return true;
+        } catch(e){ console.error('Error firebaseSaveAllInvoices', e); return false; }
+    }
+
+    // ── Guardar créditos (batch por chunks de 499) ─────────────
     async function firebaseSaveCredits(){
         try {
             if (!window.__mariscos_db) throw new Error('No firestore');
-            const db   = window.__mariscos_db;
-            const all  = (creditSales || []);
-            const SIZE = 499;
-            for (let i = 0; i < all.length; i += SIZE) {
-                const chunk = all.slice(i, i + SIZE);
+            const db  = window.__mariscos_db;
+            const all = (creditSales || []);
+            for (let i = 0; i < all.length; i += 499){
                 const batch = db.batch();
-                chunk.forEach(c => {
+                all.slice(i, i + 499).forEach(c => {
                     batch.set(db.collection('credits').doc(String(c.id)), c);
                 });
                 await batch.commit();
             }
-            console.log('✅ Créditos sincronizados a Firebase:', all.length);
+            console.log('✅ Créditos sincronizados:', all.length);
             return true;
         } catch(e){ console.error('Error firebaseSaveCredits', e); return false; }
     }
@@ -231,6 +209,7 @@
             if (!window.__mariscos_db) return;
             const db = window.__mariscos_db;
 
+            // Productos
             const prodSnap = await db.collection('products').get();
             if (!prodSnap.empty){
                 const remote = [];
@@ -245,6 +224,7 @@
                 console.log('✅ Productos cargados desde Firebase:', products.length);
             }
 
+            // Facturas — sin orderBy para evitar índice compuesto
             const invSnap = await db.collection('invoices').get();
             if (!invSnap.empty){
                 const remoteInv = [];
@@ -258,6 +238,7 @@
                 console.log('✅ Facturas cargadas desde Firebase:', invoiceHistory.length);
             }
 
+            // Créditos
             const credSnap = await db.collection('credits').get();
             if (!credSnap.empty){
                 const remoteCredits = [];
@@ -295,8 +276,7 @@
     window.firebaseSaveCredits  = firebaseSaveCredits;
     window.firebaseLoadAll      = firebaseLoadAll;
 
-    // ── Decorators — solo suben si NO viene de Firebase ────────
-    // El flag _syncingFromFirebase evita el ciclo de restauración
+    // ── Decorators — no suben si viene de Firebase ─────────────
     if (typeof window.saveProducts === 'function'){
         const orig = window.saveProducts;
         window.saveProducts = function(){
@@ -313,7 +293,7 @@
             try { orig(); } catch(e){ console.error('origSaveInvoices error', e); }
             if (window.__mariscos_isFirebaseEnabled && navigator.onLine
                 && !window.__mariscos_syncingFromFirebase){
-                firebaseSaveInvoices();
+                firebaseSaveInvoices(); // solo guarda la última
             }
         };
     }
@@ -328,7 +308,7 @@
         };
     }
 
-    // ── Sincronización manual ──────────────────────────────────
+    // ── Sincronización manual (usa sync completo de facturas) ──
     window.syncWithFirebase = async function(){
         try {
             if (!window.__mariscos_isFirebaseEnabled){
@@ -339,12 +319,12 @@
             }
             if (typeof showAlert === 'function') showAlert('Iniciando sincronización...', 'info');
             await firebaseSaveProducts();
-            await firebaseSaveInvoices();
+            await firebaseSaveAllInvoices();
             await firebaseSaveCredits();
             if (typeof showAlert === 'function') showAlert('Sincronización completada', 'success');
         } catch(e){
             console.error('syncWithFirebase error', e);
-            if (typeof showAlert === 'function') showAlert('Error sincronizando con Firebase', 'danger');
+            if (typeof showAlert === 'function') showAlert('Error sincronizando', 'danger');
         }
     };
 
@@ -358,7 +338,7 @@
             }
             if (!confirm('¿Confirmas migrar los datos locales a Firebase?')) return;
             const ok1 = await firebaseSaveProducts();
-            const ok2 = await firebaseSaveInvoices();
+            const ok2 = await firebaseSaveAllInvoices();
             const ok3 = await firebaseSaveCredits();
             if (ok1 && ok2 && ok3){
                 if (typeof showAlert === 'function') showAlert('Migración completa', 'success');
@@ -371,7 +351,7 @@
         }
     };
 
-    // ── Limpieza total de colecciones ──────────────────────────
+    // ── Limpieza total ─────────────────────────────────────────
     window.clearAllInvoices = async function(){
         if (!confirm('ATENCIÓN: Esto eliminará TODAS las facturas.\n\n¿Confirmas?')) return;
         if (!confirm('¿Estás completamente seguro?')) return;
@@ -433,7 +413,7 @@
         if (typeof updateDashboard === 'function')  updateDashboard();
     };
 
-    // ── Helpers individuales de delete/update ─────────────────
+    // ── Helpers individuales ───────────────────────────────────
     async function firebaseDeleteProduct(id){
         try {
             if (!window.__mariscos_isFirebaseEnabled || !window.__mariscos_db) return false;
@@ -477,7 +457,7 @@
         } catch(e){ console.error('firebaseUpdateCredit', e); return false; }
     }
 
-    // ── Patches de funciones existentes ───────────────────────
+    // ── Patches ────────────────────────────────────────────────
     function patch(name, wrapper){
         try {
             if (typeof window[name] === 'function'){
@@ -532,7 +512,7 @@
         return res;
     });
 
-    // ── Sincronización automática al recuperar conexión ────────
+    // ── Auto-sync al recuperar conexión ───────────────────────
     window.addEventListener('online', () => {
         if (window.__mariscos_isFirebaseEnabled){
             console.log('🌐 Conexión recuperada — sincronizando...');
