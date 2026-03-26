@@ -85,14 +85,25 @@
             if (typeof updateStorageMonitor === 'function')       updateStorageMonitor();
         }, err => console.error('Error listener productos:', err));
 
-        // Facturas — sin orderBy ni limit para evitar índice compuesto
+        // Facturas — merge entre local y Firebase
+        // Local tiene prioridad para no perder facturas que aun no
+        // llegaron a Firestore cuando el snapshot dispara
         _unsubInvoices = db.collection('invoices').onSnapshot(snap => {
             if (!_initialLoadDone) return;
             window.__mariscos_syncingFromFirebase = true;
+
             const remote = [];
             snap.forEach(d => remote.push(d.data()));
-            invoiceHistory = remote;
+
+            // Merge: Firebase primero, luego local sobreescribe
+            // Asi la factura nueva (que aun no llego a Firebase) no se pierde
+            const local = JSON.parse(localStorage.getItem('mariscos_invoices') || '[]');
+            const imap  = new Map();
+            remote.forEach(i => imap.set(i.number, i));
+            local.forEach(i => imap.set(i.number, i));  // local gana en conflicto
+            invoiceHistory = Array.from(imap.values());
             localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
+
             window.__mariscos_syncingFromFirebase = false;
             console.log('🔄 Facturas en tiempo real:', invoiceHistory.length);
             if (typeof updateReports === 'function')        updateReports();
