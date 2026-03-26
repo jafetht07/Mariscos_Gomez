@@ -85,26 +85,36 @@
             if (typeof updateStorageMonitor === 'function')       updateStorageMonitor();
         }, err => console.error('Error listener productos:', err));
 
-        // Facturas — merge entre local y Firebase
-        // Local tiene prioridad para no perder facturas que aun no
-        // llegaron a Firestore cuando el snapshot dispara
+        // Facturas — usa docChanges() para procesar cambios individuales
+        // Esto distingue entre 'added' (factura nueva) y 'removed' (borrada)
+        // sin el problema del merge que restauraba facturas eliminadas
         _unsubInvoices = db.collection('invoices').onSnapshot(snap => {
             if (!_initialLoadDone) return;
             window.__mariscos_syncingFromFirebase = true;
 
-            const remote = [];
-            snap.forEach(d => remote.push(d.data()));
+            snap.docChanges().forEach(change => {
+                const data = change.doc.data();
 
-            // Merge: Firebase primero, luego local sobreescribe
-            // Asi la factura nueva (que aun no llego a Firebase) no se pierde
-            const local = JSON.parse(localStorage.getItem('mariscos_invoices') || '[]');
-            const imap  = new Map();
-            remote.forEach(i => imap.set(i.number, i));
-            local.forEach(i => imap.set(i.number, i));  // local gana en conflicto
-            invoiceHistory = Array.from(imap.values());
+                if (change.type === 'added' || change.type === 'modified') {
+                    // Agregar o actualizar en el array local
+                    const idx = invoiceHistory.findIndex(i => i.number === data.number);
+                    if (idx >= 0) {
+                        invoiceHistory[idx] = data; // actualizar existente
+                    } else {
+                        invoiceHistory.push(data);  // agregar nueva
+                    }
+                }
+
+                if (change.type === 'removed') {
+                    // Eliminar del array local — esto propaga borrados de otros dispositivos
+                    invoiceHistory = invoiceHistory.filter(i => i.number !== data.number);
+                    console.log('🗑️ Factura eliminada en tiempo real:', data.number);
+                }
+            });
+
             localStorage.setItem('mariscos_invoices', JSON.stringify(invoiceHistory));
-
             window.__mariscos_syncingFromFirebase = false;
+
             console.log('🔄 Facturas en tiempo real:', invoiceHistory.length);
             if (typeof updateReports === 'function')        updateReports();
             if (typeof updateDashboard === 'function')      updateDashboard();
