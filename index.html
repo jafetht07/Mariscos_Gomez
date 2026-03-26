@@ -42,7 +42,6 @@
 
         <!-- SIDEBAR -->
         <aside class="sidebar" id="sidebar">
-
             <div class="sidebar-header">
                 <div class="sidebar-logo"><i data-lucide="fish"></i></div>
                 <div class="sidebar-brand">
@@ -66,7 +65,6 @@
             </div>
 
             <nav class="sidebar-nav" role="navigation" aria-label="Menú principal">
-
                 <div class="nav-section-label">Principal</div>
                 <a class="nav-item active" data-tab="dashboard" role="button" tabindex="0">
                     <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
@@ -150,7 +148,9 @@
 
             <main class="main-content" role="main">
 
-                <!-- DASHBOARD -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- DASHBOARD                                        -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="dashboard" class="page active">
                     <div class="page-header">
                         <h1 class="page-title">Panel de Control</h1>
@@ -255,9 +255,12 @@
                         </div>
                     </div>
                 </div>
+                <!-- /dashboard -->
 
 
-                <!-- INVENTARIO -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- INVENTARIO                                       -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="inventory" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Inventario de Productos</h1>
@@ -272,9 +275,12 @@
                     </div>
                     <div id="productGrid" class="product-grid" role="list"></div>
                 </div>
+                <!-- /inventory -->
 
 
-                <!-- AGREGAR PRODUCTO -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- AGREGAR PRODUCTO                                 -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="add-product" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Agregar Nuevo Producto</h1>
@@ -301,7 +307,9 @@
                                 <input type="number" id="productPrice" step="0.01" min="0" required placeholder="0.00">
                             </div>
                             <div class="form-group">
-                                <label for="productCostPrice">Precio de Costo (&#x20A1;) <span style="font-weight:400;color:var(--text-muted);text-transform:none;">(opcional)</span></label>
+                                <label for="productCostPrice">Precio de Costo (&#x20A1;)
+                                    <span style="font-weight:400;color:var(--text-muted);text-transform:none;">(opcional)</span>
+                                </label>
                                 <input type="number" id="productCostPrice" step="0.01" min="0" placeholder="0.00">
                             </div>
                             <div class="form-group">
@@ -323,14 +331,18 @@
                         </form>
                     </div>
                 </div>
+                <!-- /add-product -->
 
 
-                <!-- FACTURACIÓN -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- FACTURACIÓN                                      -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="invoice" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Sistema de Facturación</h1>
                     </div>
                     <div class="invoice-layout">
+                        <!-- Datos del cliente -->
                         <div class="form-card">
                             <h3>Datos del Cliente</h3>
                             <div class="form-group">
@@ -380,6 +392,7 @@
                             </div>
                         </div>
 
+                        <!-- Seleccionar productos -->
                         <div class="form-card">
                             <h3>Seleccionar Productos</h3>
                             <div class="form-group">
@@ -395,52 +408,60 @@
                             <button type="button" class="btn" id="addToInvoiceBtn">Agregar al Pedido</button>
                         </div>
                     </div>
+                    <!-- /invoice-layout -->
 
+                    <!-- Resumen del pedido -->
                     <div class="invoice-section">
-    <h3>Resumen del Pedido</h3>
-    <div id="invoiceItems" role="list"></div>
+                        <h3>Resumen del Pedido</h3>
+                        <div id="invoiceItems" role="list"></div>
 
-    <!-- Descuento en colones -->
-    <div style="margin-top:16px;padding:14px;background:rgba(245,158,11,0.08);
-                border:1px solid rgba(245,158,11,0.25);border-radius:8px;">
-        <label style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <span style="font-size:0.85rem;font-weight:600;color:var(--amber-light);white-space:nowrap;">
-                Descuento (₡):
-            </span>
-            <input type="number" id="invoiceDiscount" min="0" step="100"
-                placeholder="0"
-                oninput="updateInvoiceDisplay()"
-                style="width:160px;padding:8px 12px;border:1px solid rgba(245,158,11,0.35);
-                       border-radius:6px;background:var(--bg-input);
-                       color:var(--text-primary);font-size:0.88rem;">
-            <span style="font-size:0.78rem;color:var(--text-muted);">
-                Dejar en 0 si no hay descuento
-            </span>
-        </label>
-    </div>
+                        <!-- Descuento en colones -->
+                        <div style="margin-top:16px;padding:14px;background:rgba(245,158,11,0.08);
+                                    border:1px solid rgba(245,158,11,0.25);border-radius:8px;">
+                            <label style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                                <span style="font-size:0.85rem;font-weight:600;color:var(--amber-light);white-space:nowrap;">
+                                    Descuento (&#x20A1;):
+                                </span>
+                                <input type="number" id="invoiceDiscount" min="0" step="100"
+                                    placeholder="0"
+                                    oninput="updateInvoiceDisplay()"
+                                    style="width:160px;padding:8px 12px;border:1px solid rgba(245,158,11,0.35);
+                                           border-radius:6px;background:var(--bg-input);
+                                           color:var(--text-primary);font-size:0.88rem;">
+                                <span style="font-size:0.78rem;color:var(--text-muted);">
+                                    Dejar en 0 si no hay descuento
+                                </span>
+                            </label>
+                        </div>
 
-    <!-- Subtotal, descuento y total -->
-    <div style="margin-top:12px;">
-        <div id="invoiceSubtotal"
-             style="text-align:right;font-size:0.9rem;color:var(--text-secondary);padding:4px 0;">
-            Subtotal: ₡0.00
-        </div>
-        <div id="invoiceDiscountDisplay"
-             style="display:none;text-align:right;font-size:0.9rem;
-                    color:var(--amber-light);font-weight:600;padding:4px 0;">
-            Descuento: -₡0.00
-        </div>
-        <div id="invoiceTotal" class="invoice-total">Total: ₡0.00</div>
-    </div>
+                        <!-- Totales -->
+                        <div style="margin-top:12px;">
+                            <div id="invoiceSubtotal"
+                                 style="text-align:right;font-size:0.9rem;color:var(--text-secondary);padding:4px 0;">
+                                Subtotal: &#x20A1;0.00
+                            </div>
+                            <div id="invoiceDiscountDisplay"
+                                 style="display:none;text-align:right;font-size:0.9rem;
+                                        color:var(--amber-light);font-weight:600;padding:4px 0;">
+                                Descuento: -&#x20A1;0.00
+                            </div>
+                            <div id="invoiceTotal" class="invoice-total">Total: &#x20A1;0.00</div>
+                        </div>
 
-    <div class="action-buttons" style="margin-top:20px;">
-        <button class="btn btn-success" id="generatePDFBtn">Generar Factura PDF</button>
-        <button class="btn btn-danger"  id="clearInvoiceBtn">Limpiar Pedido</button>
-    </div>
-</div>
+                        <div class="action-buttons" style="margin-top:20px;">
+                            <button class="btn btn-success" id="generatePDFBtn">Generar Factura PDF</button>
+                            <button class="btn btn-danger"  id="clearInvoiceBtn">Limpiar Pedido</button>
+                        </div>
+                    </div>
+                    <!-- /invoice-section -->
+
+                </div>
+                <!-- /invoice -->
 
 
-                <!-- REPORTES GENERALES -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- REPORTES GENERALES                               -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="reports" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Reportes y Estadísticas</h1>
@@ -468,9 +489,12 @@
                         </div>
                     </div>
                 </div>
+                <!-- /reports -->
 
 
-                <!-- REPORTES DE VENTAS -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- REPORTES DE VENTAS                               -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="sales-reports" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Reportes Detallados de Ventas</h1>
@@ -522,86 +546,12 @@
                         </table>
                     </div>
                 </div>
+                <!-- /sales-reports -->
 
 
-                <!-- MANTENIMIENTO -->
-                <div id="maintenance" class="page hidden">
-                    <div class="page-header">
-                        <h1 class="page-title">Mantenimiento del Sistema</h1>
-                    </div>
-                    <div style="margin-bottom:15px;display:flex;gap:10px;flex-wrap:wrap;">
-                        <button class="btn btn-info"    onclick="syncWithFirebase()">Sincronizar con Firebase</button>
-                        <button class="btn btn-success" onclick="migrateToFirebase()">Migrar Datos Locales a Firebase</button>
-                    </div>
-                    <div class="maintenance-section">
-                        <h3>Estado del Sistema</h3>
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <div class="stat-number" id="storageUsagePercent">0%</div>
-                                <div>Almacenamiento Usado</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="oldRecordsCount">0</div>
-                                <div>Registros Antiguos (&gt;6 meses)</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="systemPerformance">100%</div>
-                                <div>Rendimiento del Sistema</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="maintenance-section">
-                        <h3>Alertas del Sistema</h3>
-                        <div id="systemAlerts" role="alert"></div>
-                    </div>
-                    <div class="maintenance-section">
-                        <h3>Limpieza y Backup</h3>
-                        <p style="color:var(--text-secondary);margin-bottom:14px;">
-                            Herramientas para archivar datos históricos y optimizar el almacenamiento local.
-                        </p>
-                    <div class="maintenance-buttons">
-                        <button class="btn btn-warning" onclick="archiveOldData()">Archivar Datos Antiguos</button>
-                         <button class="btn btn-success" onclick="exportAllData()">Backup Completo</button>
-                        <button class="btn btn-info"    onclick="optimizeStorage()">Optimizar Almacenamiento</button>
-                        <button class="btn btn-danger"  onclick="clearOldInvoices()">Eliminar Facturas Antiguas</button>
-                        <button class="btn btn-warning" onclick="resetLocalStorage()">Limpiar Caché Local</button>
-                    </div>
-
-
-                    <div class="maintenance-section" style="margin-top:16px;">
-                    <h3>Limpieza Total de Datos</h3>
-                    <p style="color:var(--danger);margin-bottom:14px;font-weight:600;font-size:0.85rem;">
-                      Estas acciones eliminan datos permanentemente de Firebase y del almacenamiento local.
-                    </p>
-
-                    <div class="maintenance-buttons">
-                       <button class="btn btn-danger" onclick="clearAllInvoices()">Borrar Todas las Facturas</button>
-                       <button class="btn btn-danger" onclick="clearAllProducts()">Borrar Todos los Productos</button>
-                       <button class="btn btn-danger" onclick="clearAllCredits()">Borrar Todos los Créditos</button>
-                    </div>
-                    </div> 
-                    
-                    </div>
-                    <div class="maintenance-section">
-                        <h3>Configuración de Límites</h3>
-                        <div class="form-group">
-                            <label for="maxInvoices">Máximo de Facturas a Conservar</label>
-                            <input type="number" id="maxInvoices" value="1000" min="100" max="10000">
-                            <small style="color:var(--text-muted);">Recomendado: entre 1 000 y 2 000 facturas</small>
-                        </div>
-                        <div class="form-group">
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:0.88rem;font-weight:500;">
-                                <input type="checkbox" id="autoCleanupEnabled" style="width:16px;height:16px;">
-                                Activar limpieza automática
-                            </label>
-                            <small style="color:var(--text-muted);">Se ejecuta cuando el almacenamiento supera el 80%</small>
-                        </div>
-                        <button class="btn btn-success" onclick="saveMaintenanceConfig()">Guardar Configuración</button>
-                    </div>
-                </div>
-
-
-                <!-- GESTIÓN DE CRÉDITOS -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- GESTIÓN DE CRÉDITOS                              -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="credits" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Gestión de Créditos</h1>
@@ -652,9 +602,12 @@
                         </table>
                     </div>
                 </div>
+                <!-- /credits -->
 
 
-                <!-- REPORTES DE CRÉDITOS -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- REPORTES DE CRÉDITOS                             -->
+                <!-- ═══════════════════════════════════════════════ -->
                 <div id="credits-reports" class="page hidden">
                     <div class="page-header">
                         <h1 class="page-title">Reportes de Créditos</h1>
@@ -766,14 +719,94 @@
                         </div>
                     </div>
                 </div>
+                <!-- /credits-reports -->
+
+
+                <!-- ═══════════════════════════════════════════════ -->
+                <!-- MANTENIMIENTO                                    -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <div id="maintenance" class="page hidden">
+                    <div class="page-header">
+                        <h1 class="page-title">Mantenimiento del Sistema</h1>
+                    </div>
+                    <div style="margin-bottom:15px;display:flex;gap:10px;flex-wrap:wrap;">
+                        <button class="btn btn-info"    onclick="syncWithFirebase()">Sincronizar con Firebase</button>
+                        <button class="btn btn-success" onclick="migrateToFirebase()">Migrar Datos Locales a Firebase</button>
+                    </div>
+                    <div class="maintenance-section">
+                        <h3>Estado del Sistema</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number" id="storageUsagePercent">0%</div>
+                                <div>Almacenamiento Usado</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="oldRecordsCount">0</div>
+                                <div>Registros Antiguos (&gt;6 meses)</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="systemPerformance">100%</div>
+                                <div>Rendimiento del Sistema</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="maintenance-section">
+                        <h3>Alertas del Sistema</h3>
+                        <div id="systemAlerts" role="alert"></div>
+                    </div>
+                    <div class="maintenance-section">
+                        <h3>Limpieza y Backup</h3>
+                        <p style="color:var(--text-secondary);margin-bottom:14px;">
+                            Herramientas para archivar datos históricos y optimizar el almacenamiento local.
+                        </p>
+                        <div class="maintenance-buttons">
+                            <button class="btn btn-warning" onclick="archiveOldData()">Archivar Datos Antiguos</button>
+                            <button class="btn btn-success" onclick="exportAllData()">Backup Completo</button>
+                            <button class="btn btn-info"    onclick="optimizeStorage()">Optimizar Almacenamiento</button>
+                            <button class="btn btn-danger"  onclick="clearOldInvoices()">Eliminar Facturas Antiguas</button>
+                            <button class="btn btn-warning" onclick="resetLocalStorage()">Limpiar Caché Local</button>
+                        </div>
+                    </div>
+                    <div class="maintenance-section" style="margin-top:16px;">
+                        <h3>Limpieza Total de Datos</h3>
+                        <p style="color:var(--danger);margin-bottom:14px;font-weight:600;font-size:0.85rem;">
+                            Estas acciones eliminan datos permanentemente de Firebase y del almacenamiento local.
+                        </p>
+                        <div class="maintenance-buttons">
+                            <button class="btn btn-danger" onclick="clearAllInvoices()">Borrar Todas las Facturas</button>
+                            <button class="btn btn-danger" onclick="clearAllProducts()">Borrar Todos los Productos</button>
+                            <button class="btn btn-danger" onclick="clearAllCredits()">Borrar Todos los Créditos</button>
+                        </div>
+                    </div>
+                    <div class="maintenance-section">
+                        <h3>Configuración de Límites</h3>
+                        <div class="form-group">
+                            <label for="maxInvoices">Máximo de Facturas a Conservar</label>
+                            <input type="number" id="maxInvoices" value="1000" min="100" max="10000">
+                            <small style="color:var(--text-muted);">Recomendado: entre 1 000 y 2 000 facturas</small>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:0.88rem;font-weight:500;">
+                                <input type="checkbox" id="autoCleanupEnabled" style="width:16px;height:16px;">
+                                Activar limpieza automática
+                            </label>
+                            <small style="color:var(--text-muted);">Se ejecuta cuando el almacenamiento supera el 80%</small>
+                        </div>
+                        <button class="btn btn-success" onclick="saveMaintenanceConfig()">Guardar Configuración</button>
+                    </div>
+                </div>
+                <!-- /maintenance -->
 
             </main>
         </div>
+        <!-- /main-wrapper -->
+
     </div>
+    <!-- /mainSystem -->
 
 
-    <!-- SCRIPTS — sin carpeta js/ para GitHub Pages -->
- <script src="state.js"></script>
+    <!-- SCRIPTS -->
+    <script src="state.js"></script>
     <script src="ui.js"></script>
     <script src="auth.js"></script>
     <script src="products.js"></script>
@@ -793,14 +826,8 @@
     const menuToggle     = document.getElementById('menuToggle');
     const sidebarClose   = document.getElementById('sidebarClose');
 
-    function openSidebar() {
-        sidebar.classList.add('open');
-        sidebarOverlay.classList.add('show');
-    }
-    function closeSidebar() {
-        sidebar.classList.remove('open');
-        sidebarOverlay.classList.remove('show');
-    }
+    function openSidebar()  { sidebar.classList.add('open');    sidebarOverlay.classList.add('show'); }
+    function closeSidebar() { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('show'); }
 
     menuToggle.addEventListener('click', openSidebar);
     sidebarClose.addEventListener('click', closeSidebar);
@@ -881,10 +908,6 @@
         applyTheme(document.body.classList.contains('light-mode') ? 'dark' : 'light');
     });
 
-    /* ============================================================
-       INICIALIZAR ICONOS LUCIDE
-       Debe ir al final para capturar todos los data-lucide del DOM
-    ============================================================ */
     lucide.createIcons();
     </script>
 
