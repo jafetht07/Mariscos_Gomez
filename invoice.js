@@ -7,19 +7,12 @@ function saveInvoices() {
     updateStorageMonitor();
 }
 
-// ============================================================
-// updateInvoiceProductSelect
-// Carga el dropdown de productos para facturar.
-// Si el usuario es Tuko, muestra también el precio de costo
-// como opción alternativa de precio (se maneja en addToInvoice).
-// ============================================================
 function updateInvoiceProductSelect() {
     const select = document.getElementById('invoiceProduct');
     select.innerHTML = '<option value="">Seleccionar producto</option>';
-    const fmt = n => n.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
     products.forEach(product => {
         if (product.stock > 0) {
+            const fmt = n => n.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const option = document.createElement('option');
             option.value = product.id;
             option.textContent = `${product.name} - ₡${fmt(product.price)} / ${product.unit} (Stock: ${product.stock})`;
@@ -27,19 +20,12 @@ function updateInvoiceProductSelect() {
         }
     });
 
-    // Mostrar/ocultar opción de precio de costo según usuario
     const costToggle = document.getElementById('useCostPriceRow');
     if (costToggle) {
         costToggle.style.display = currentUser === 'Tuko' ? 'block' : 'none';
     }
 }
 
-// ============================================================
-// addToInvoice
-// Agrega un producto a la factura activa.
-// Si Tuko activó "usar precio de costo", se usa costPrice
-// en lugar del precio de venta normal.
-// ============================================================
 function addToInvoice() {
     const productId = parseInt(document.getElementById('invoiceProduct').value);
     const quantity  = parseFloat(document.getElementById('invoiceQuantity').value);
@@ -57,7 +43,6 @@ function addToInvoice() {
         return;
     }
 
-    // Determinar qué precio usar
     const useCostPrice = currentUser === 'Tuko' &&
         document.getElementById('useCostPrice') &&
         document.getElementById('useCostPrice').checked;
@@ -67,7 +52,7 @@ function addToInvoice() {
 
     if (useCostPrice) {
         if (!product.costPrice || product.costPrice <= 0) {
-            showAlert(`"${product.name}" no tiene precio de costo registrado. Se usará precio de venta.`, 'warning');
+            showAlert(`"${product.name}" no tiene precio de costo. Se usará precio de venta.`, 'warning');
         } else {
             priceToUse = product.costPrice;
             priceLabel = 'costo';
@@ -85,12 +70,12 @@ function addToInvoice() {
     } else {
         invoiceItems.push({
             productId,
-            name:       product.name,
-            price:      priceToUse,
-            priceType:  priceLabel,   // 'venta' o 'costo' — se guarda en la factura
+            name:      product.name,
+            price:     priceToUse,
+            priceType: priceLabel,
             quantity,
-            unit:       product.unit,
-            total:      priceToUse * quantity
+            unit:      product.unit,
+            total:     priceToUse * quantity
         });
     }
 
@@ -101,18 +86,16 @@ function addToInvoice() {
 
 // ============================================================
 // updateInvoiceDisplay
-// Renderiza los ítems de la factura actual.
-// Si el ítem fue agregado a precio de costo, muestra una
-// etiqueta "COSTO" visible solo para Tuko.
+// Renderiza los ítems y calcula subtotal, descuento y total
+// final en tiempo real mientras el usuario edita el descuento.
 // ============================================================
 function updateInvoiceDisplay() {
     const itemsContainer = document.getElementById('invoiceItems');
-    const totalContainer = document.getElementById('invoiceTotal');
-    const fmt = n => n.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmt    = n => n.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const isTuko = currentUser === 'Tuko';
 
     itemsContainer.innerHTML = '';
-    let total = 0;
+    let subtotal = 0;
 
     invoiceItems.forEach((item, index) => {
         const costBadge = (isTuko && item.priceType === 'costo')
@@ -134,10 +117,23 @@ function updateInvoiceDisplay() {
             </div>
         `;
         itemsContainer.appendChild(div);
-        total += item.total;
+        subtotal += item.total;
     });
 
-    totalContainer.textContent = `Total: ₡${fmt(total)}`;
+    // Calcular descuento y total final
+    const discountInput = document.getElementById('invoiceDiscount');
+    const discount      = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
+    const finalTotal    = Math.max(0, subtotal - discount);
+
+    // Actualizar resumen visual
+    const subtotalEl = document.getElementById('invoiceSubtotal');
+    const discountEl = document.getElementById('invoiceDiscountDisplay');
+    const totalEl    = document.getElementById('invoiceTotal');
+
+    if (subtotalEl) subtotalEl.textContent = `Subtotal: ₡${fmt(subtotal)}`;
+    if (discountEl) discountEl.style.display = discount > 0 ? 'block' : 'none';
+    if (discountEl) discountEl.textContent = `Descuento: -₡${fmt(discount)}`;
+    if (totalEl)    totalEl.textContent    = `Total: ₡${fmt(finalTotal)}`;
 }
 
 function removeFromInvoice(index) {
@@ -153,6 +149,8 @@ function clearInvoice() {
     document.getElementById('clientName').value    = '';
     document.getElementById('clientPhone').value   = '';
     document.getElementById('clientAddress').value = '';
+    const discountInput = document.getElementById('invoiceDiscount');
+    if (discountInput) discountInput.value = '';
     updateInvoiceDisplay();
 }
 
@@ -163,18 +161,24 @@ function toggleCreditOptions() {
 }
 
 // ============================================================
-// generateInvoicePDF
-// Genera la factura y el PDF. Si algún ítem fue vendido a
-// precio de costo, se guarda esa info en el objeto invoice
-// para referencia futura (no aparece en el PDF del cliente).
+// generateInvoiceNumber
+// Usa timestamp en milisegundos — nunca colisiona aunque se
+// borren facturas previas o varios dispositivos generen al
+// mismo tiempo.
 // ============================================================
+function generateInvoiceNumber() {
+    const year = new Date().getFullYear();
+    const ts   = Date.now();
+    return `FAC-${year}-T${ts}`;
+}
+
 function generateInvoicePDF() {
     if (invoiceItems.length === 0) {
         showAlert('No hay productos en la factura', 'danger');
         return;
     }
     if (invoiceHistory.length >= maintenanceConfig.maxInvoices) {
-        if (confirm('Se alcanzó el límite de facturas. ¿Continuar de todas formas?')) {
+        if (confirm('Se ha alcanzado el límite de facturas. ¿Desea continuar?')) {
             showAlert('Sistema cerca del límite. Visite Mantenimiento.', 'warning');
         } else return;
     }
@@ -184,10 +188,23 @@ function generateInvoicePDF() {
     const clientAddress = document.getElementById('clientAddress').value || 'N/A';
     const isCreditSale  = document.getElementById('isCreditSale').checked;
 
-    const invoiceNumber = `FAC-${new Date().getFullYear()}-${String(invoiceHistory.length + 1).padStart(4, '0')}`;
-    const now = new Date();
+    // Leer descuento ingresado (0 si está vacío)
+    const discountInput = document.getElementById('invoiceDiscount');
+    const discount      = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
 
-    // Calcular costo total de la venta (para reportes internos)
+    const invoiceNumber = generateInvoiceNumber();
+    const now           = new Date();
+
+    // Subtotal antes del descuento
+    const subtotal   = invoiceItems.reduce((sum, item) => sum + item.total, 0);
+    const finalTotal = Math.max(0, subtotal - discount);
+
+    if (discount > subtotal) {
+        showAlert('El descuento no puede ser mayor al subtotal de la factura', 'danger');
+        return;
+    }
+
+    // Costo total para reportes internos
     const totalCost = invoiceItems.reduce((sum, item) => {
         const product = products.find(p => p.id === item.productId);
         return sum + ((product?.costPrice || 0) * item.quantity);
@@ -207,31 +224,32 @@ function generateInvoicePDF() {
         fullDateTime: now.toISOString(),
         client:       { name: clientName, phone: clientPhone, address: clientAddress },
         items:        [...invoiceItems],
-        total:        invoiceItems.reduce((sum, item) => sum + item.total, 0),
-        totalCost,    // costo total de los productos vendidos
+        subtotal,               // total antes del descuento
+        discount,               // monto del descuento en colones
+        total:        finalTotal, // total final que pagó el cliente
+        totalCost,
         user:         currentUser,
         isCredit:     isCreditSale,
-        // Marcar si algún ítem fue vendido a precio de costo (solo para Tuko)
         hasCostItems: invoiceItems.some(i => i.priceType === 'costo')
     };
 
     invoiceHistory.push(invoice);
     saveInvoices();
 
-    // Registrar crédito si aplica
+    // Registrar crédito si aplica — usa el total final con descuento
     if (isCreditSale) {
         const creditDays  = parseInt(document.getElementById('creditDays').value);
         const creditNotes = document.getElementById('creditNotes').value || '';
-        const dueDate = new Date(now);
+        const dueDate     = new Date(now);
         dueDate.setDate(dueDate.getDate() + creditDays);
 
         creditSales.push({
-            id: nextCreditId++,
+            id:          nextCreditId++,
             invoiceNumber,
             client:      { name: clientName, phone: clientPhone, address: clientAddress },
-            totalAmount: invoice.total,
+            totalAmount: finalTotal, // el crédito es por el total ya con descuento
             paidAmount:  0,
-            balance:     invoice.total,
+            balance:     finalTotal,
             saleDate:    now.toISOString(),
             dueDate:     dueDate.toISOString(),
             status:      'pending',
@@ -243,12 +261,12 @@ function generateInvoicePDF() {
         showAlert('Venta a crédito registrada', 'success');
     }
 
-    // Generar PDF
+    // Generar PDF con descuento visible
     const doc = generateInvoiceVoucherPDF(invoice);
 
     if (isCreditSale) {
         const creditDays = parseInt(document.getElementById('creditDays').value);
-        const dueDate = new Date(now);
+        const dueDate    = new Date(now);
         dueDate.setDate(dueDate.getDate() + creditDays);
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
@@ -279,9 +297,8 @@ function generateInvoicePDF() {
 
 // ============================================================
 // generateInvoiceVoucherPDF
-// Genera el PDF voucher estilo recibo (80mm).
-// El PDF del cliente NO muestra si fue precio de costo,
-// esa info es solo interna.
+// Genera el voucher PDF formato 80mm.
+// Si hay descuento lo muestra como línea separada antes del total.
 // ============================================================
 function generateInvoiceVoucherPDF(invoice) {
     const { jsPDF } = window.jspdf;
@@ -334,9 +351,9 @@ function generateInvoiceVoucherPDF(invoice) {
 
     doc.setFont(undefined, 'bold');
     doc.text('PRODUCTO', 5, y);
-    doc.text('CANT', 45, y);
+    doc.text('CANT',   45, y);
     doc.text('PRECIO', 55, y);
-    doc.text('TOTAL', 68, y);
+    doc.text('TOTAL',  68, y);
     y += 4;
     doc.line(5, y, 75, y);
     y += 4;
@@ -345,16 +362,35 @@ function generateInvoiceVoucherPDF(invoice) {
     doc.setFontSize(8);
     invoice.items.forEach(item => {
         const nombre = item.name.length > 18 ? item.name.substring(0, 18) + '.' : item.name;
-        doc.text(nombre, 5, y);
+        doc.text(nombre,                5,  y);
         doc.text(String(item.quantity), 45, y);
-        doc.text(fmt(item.price), 53, y);
-        doc.text(fmt(item.total), 66, y);
+        doc.text(fmt(item.price),       53, y);
+        doc.text(fmt(item.total),       66, y);
         y += 5;
     });
 
     doc.line(5, y, 75, y);
     y += 5;
 
+    // Mostrar subtotal si hay descuento
+    if (invoice.discount && invoice.discount > 0) {
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text('Subtotal:', 5, y);
+        doc.text(`C${fmt(invoice.subtotal)}`, 75, y, { align: 'right' });
+        y += 5;
+
+        doc.setFont(undefined, 'bold');
+        doc.text('Descuento:', 5, y);
+        doc.text(`-C${fmt(invoice.discount)}`, 75, y, { align: 'right' });
+        y += 5;
+
+        doc.setLineWidth(0.3);
+        doc.line(5, y, 75, y);
+        y += 4;
+    }
+
+    // Total final
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     doc.text('TOTAL:', 5, y);
