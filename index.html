@@ -397,15 +397,47 @@
                     </div>
 
                     <div class="invoice-section">
-                        <h3>Resumen del Pedido</h3>
-                        <div id="invoiceItems" role="list"></div>
-                        <div id="invoiceTotal" class="invoice-total">Total: &#x20A1;0.00</div>
-                        <div class="action-buttons" style="margin-top:20px;">
-                            <button class="btn btn-success" id="generatePDFBtn">Generar Factura PDF</button>
-                            <button class="btn btn-danger"  id="clearInvoiceBtn">Limpiar Pedido</button>
-                        </div>
-                    </div>
-                </div>
+    <h3>Resumen del Pedido</h3>
+    <div id="invoiceItems" role="list"></div>
+
+    <!-- Descuento en colones -->
+    <div style="margin-top:16px;padding:14px;background:rgba(245,158,11,0.08);
+                border:1px solid rgba(245,158,11,0.25);border-radius:8px;">
+        <label style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:0.85rem;font-weight:600;color:var(--amber-light);white-space:nowrap;">
+                Descuento (₡):
+            </span>
+            <input type="number" id="invoiceDiscount" min="0" step="100"
+                placeholder="0"
+                oninput="updateInvoiceDisplay()"
+                style="width:160px;padding:8px 12px;border:1px solid rgba(245,158,11,0.35);
+                       border-radius:6px;background:var(--bg-input);
+                       color:var(--text-primary);font-size:0.88rem;">
+            <span style="font-size:0.78rem;color:var(--text-muted);">
+                Dejar en 0 si no hay descuento
+            </span>
+        </label>
+    </div>
+
+    <!-- Subtotal, descuento y total -->
+    <div style="margin-top:12px;">
+        <div id="invoiceSubtotal"
+             style="text-align:right;font-size:0.9rem;color:var(--text-secondary);padding:4px 0;">
+            Subtotal: ₡0.00
+        </div>
+        <div id="invoiceDiscountDisplay"
+             style="display:none;text-align:right;font-size:0.9rem;
+                    color:var(--amber-light);font-weight:600;padding:4px 0;">
+            Descuento: -₡0.00
+        </div>
+        <div id="invoiceTotal" class="invoice-total">Total: ₡0.00</div>
+    </div>
+
+    <div class="action-buttons" style="margin-top:20px;">
+        <button class="btn btn-success" id="generatePDFBtn">Generar Factura PDF</button>
+        <button class="btn btn-danger"  id="clearInvoiceBtn">Limpiar Pedido</button>
+    </div>
+</div>
 
 
                 <!-- REPORTES GENERALES -->
@@ -741,16 +773,16 @@
 
 
     <!-- SCRIPTS — sin carpeta js/ para GitHub Pages -->
- <script src="state.js"></script>
-    <script src="ui.js"></script>
-    <script src="auth.js"></script>
-    <script src="products.js"></script>
-    <script src="invoice.js"></script>
-    <script src="credits.js"></script>
-    <script src="reports.js"></script>
-    <script src="maintenance.js"></script>
-    <script src="app.js"></script>
-    <script src="firebase-integration.js"></script>
+    <script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/products.js"></script>
+<script src="js/invoice.js"></script>
+<script src="js/credits.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/maintenance.js"></script>
+<script src="js/app.js"></script>
+<script src="firebase-integration.js"></script>
 
     <script>
     /* ============================================================
