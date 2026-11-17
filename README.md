@@ -1,7 +1,7 @@
 # Mariscos Gómez
 > Sistema de inventario, facturación y créditos para un negocio de mariscos, con sincronización opcional en Firestore.
 
-## 🇪🇸 Español
+## Español
 
 ### ¿Qué es?
 
@@ -122,7 +122,7 @@ Mariscos_Gomez/
 
 ---
 
-## 🇬🇧 English
+## English
 
 ### What is it?
 
